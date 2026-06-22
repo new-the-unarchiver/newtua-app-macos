@@ -3,10 +3,26 @@ import Foundation
 /// A job-in-flight (or candidate) paired with its resolved destination.
 /// Bundling them removes a positional-parameter footgun and keeps pick/launch
 /// from re-deriving the destination independently.
+///
+/// `destinationKey` is `destination.standardizedFileURL.path` precomputed
+/// once at construction — the predicate compares strings instead of
+/// re-allocating standardized URLs on every pair check.
 @MainActor
 struct PendingJob {
     let job: ArchiveJob
     let destination: URL
+    let destinationKey: String
+
+    init(job: ArchiveJob, destination: URL) {
+        self.job = job
+        self.destination = destination
+        self.destinationKey = destination.standardizedFileURL.path
+    }
+
+    /// Convenience: use the job's default ("next to archive") destination.
+    init(_ job: ArchiveJob) {
+        self.init(job: job, destination: job.defaultDestination)
+    }
 }
 
 /// Pure compatibility check: can two jobs run in parallel?
@@ -20,10 +36,7 @@ struct PendingJob {
 ///   probe can't classify (`.unknown` falls back to serial — safe default).
 @MainActor
 func areCompatible(_ a: PendingJob, _ b: PendingJob, probe: VolumeProbing) -> Bool {
-    // Compare by `.path`: URL equality is trailing-slash-sensitive, but a
-    // file's `deletingLastPathComponent()` adds the slash while
-    // `URL(fileURLWithPath:)` for the same directory does not.
-    if a.destination.standardizedFileURL.path == b.destination.standardizedFileURL.path {
+    if a.destinationKey == b.destinationKey {
         return false
     }
     if a.job.state.isAwaitingPassword || b.job.state.isAwaitingPassword {

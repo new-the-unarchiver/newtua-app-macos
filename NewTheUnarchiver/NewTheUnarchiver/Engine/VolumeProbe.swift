@@ -17,7 +17,7 @@ protocol VolumeProbing: Sendable {
     func mediumType(_ url: URL) -> VolumeMediumType
 }
 
-/// macOS implementation backed by `URLResourceValues`, with a mount-path
+/// macOS implementation backed by `URLResourceValues`, with a two-tier
 /// cache so the same volume isn't re-queried for every job in the queue.
 ///
 /// SSD/HDD detection on v1 is a heuristic: any internal volume is assumed
@@ -44,22 +44,39 @@ final class SystemVolumeProbe: VolumeProbing, @unchecked Sendable {
     }
 
     private func reading(for url: URL) -> Reading {
-        let keys: Set<URLResourceKey> = [
-            .volumeURLKey, .volumeIsInternalKey, .volumeNameKey, .volumeLocalizedFormatDescriptionKey
-        ]
-        let values = try? url.resourceValues(forKeys: keys)
-        // Cache by the volume's mount URL — the same physical disk shows up
-        // through many paths (every file on it), but the volumeURL is canonical.
-        let mountKey = values?.volume?.path ?? url.path
-        if let hit = cache.withLock({ $0[mountKey] }) {
+        // Hot path: same URL queried again → answer from cache, no syscall.
+        if let hit = cache.withLock({ $0[url.path] }) {
             return hit
         }
-        let isInternal = values?.volumeIsInternal ?? false
-        let fusion = (values?.volumeLocalizedFormatDescription ?? "")
+
+        let keys: Set<URLResourceKey> = [
+            .volumeURLKey, .volumeIsInternalKey, .volumeLocalizedFormatDescriptionKey
+        ]
+        guard
+            let values = try? url.resourceValues(forKeys: keys),
+            let mountURL = values.volume
+        else {
+            // Couldn't classify — pessimistic default, not cached. Don't cache
+            // here: every bogus path would otherwise grow the dictionary.
+            return Reading(isInternal: false, medium: .unknown)
+        }
+        let mountKey = mountURL.path
+        // Mount-keyed hit: same volume seen via a different file URL.
+        if let hit = cache.withLock({ $0[mountKey] }) {
+            cache.withLock { $0[url.path] = hit }
+            return hit
+        }
+        let isInternal = values.volumeIsInternal ?? false
+        let fusion = (values.volumeLocalizedFormatDescription ?? "")
             .localizedCaseInsensitiveContains("fusion")
-        let medium: VolumeMediumType = isInternal && !fusion ? .ssd : .unknown
-        let reading = Reading(isInternal: isInternal, medium: medium)
-        cache.withLock { $0[mountKey] = reading }
+        let reading = Reading(
+            isInternal: isInternal,
+            medium: isInternal && !fusion ? .ssd : .unknown
+        )
+        cache.withLock {
+            $0[mountKey] = reading
+            $0[url.path] = reading
+        }
         return reading
     }
 }

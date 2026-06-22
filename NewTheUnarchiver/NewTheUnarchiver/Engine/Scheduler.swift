@@ -8,6 +8,10 @@ import Foundation
 /// job that's compatible with every still-running job.
 @MainActor
 final class Scheduler {
+    /// Upper bound on concurrent jobs regardless of CPU count. Mentioned in
+    /// decisions.md as 4 — kept here so docstrings/tests share one source.
+    static let parallelCeiling = 4
+
     let model: AppModel
     let probe: VolumeProbing
     let maxParallel: Int
@@ -30,7 +34,7 @@ final class Scheduler {
     ) {
         self.model = model
         self.probe = probe
-        self.maxParallel = maxParallel ?? max(1, min(cpuCount(), 4))
+        self.maxParallel = maxParallel ?? max(1, min(cpuCount(), Self.parallelCeiling))
     }
 
     /// Try to start as many compatible queued jobs as possible. Call after
@@ -42,9 +46,12 @@ final class Scheduler {
     }
 
     /// Suspends until no jobs are active. Useful for tests and shutdown.
+    /// Snapshots the active task list each pass so newly-added actives are
+    /// awaited on the next iteration; the loop exits once `active` is empty.
     func waitUntilQuiescent() async {
-        while let task = active.values.first?.task {
-            _ = await task.value
+        while !active.isEmpty {
+            let tasks = Array(active.values.map(\.task))
+            for task in tasks { _ = await task.value }
         }
     }
 
@@ -56,7 +63,7 @@ final class Scheduler {
         let activePairs = Array(active.values.map(\.pending))
         for job in model.queue {
             guard job.state.isQueued else { continue }
-            let candidate = PendingJob(job: job, destination: job.defaultDestination)
+            let candidate = PendingJob(job)
             let compatible = activePairs.allSatisfy { a in
                 areCompatible(a, candidate, probe: probe)
             }
