@@ -35,4 +35,10 @@ final class ArchiveJob: Identifiable {
         guard case .running = state else { return }
         progress = p
     }
+
+    /// Stage 2 default extraction destination: the directory containing the
+    /// archive. Stage 8 will layer the full destination strategy on top.
+    var defaultDestination: URL {
+        url.deletingLastPathComponent()
+    }
 }

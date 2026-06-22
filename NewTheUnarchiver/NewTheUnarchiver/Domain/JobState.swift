@@ -26,6 +26,10 @@ enum JobState: Sendable, Equatable {
         if case .queued = self { true } else { false }
     }
 
+    var isAwaitingPassword: Bool {
+        if case .needsPassword = self { true } else { false }
+    }
+
     /// Permissive: only blocks leaving terminal states. The runner is the
     /// authority on target-specific validity (e.g. `.queued → .succeeded`
     /// without `.running` is allowed here but the runner won't issue it).

@@ -418,3 +418,78 @@ memberwise `init` и `Equatable` — нужны для тестирования 
 
 **Повторный прогон:** 34/34 в `NewTheUnarchiverTests` зелёные;
 20/20 в Newtua-пакете зелёные.
+
+## 2026-06-23 — Этап 3 завершён
+
+Умный планировщик параллели заменил последовательный `QueueDriver`:
+- `Engine/VolumeProbe.swift` — протокол `VolumeProbing` (`isInternal`,
+  `mediumType`) + `enum VolumeMediumType { ssd, hdd, unknown }` +
+  `SystemVolumeProbe` (final class, кеш по mount-path через
+  `OSAllocatedUnfairLock`).
+- `Engine/CompatibilityPredicate.swift` — `struct PendingJob { job,
+  destination }` и pure `areCompatible(_:_:probe:)`. Блокеры:
+  совпадение `destination.standardizedFileURL.path`, awaiting password
+  у любой стороны, не-internal / не-SSD исходник.
+- `Engine/Scheduler.swift` — `@MainActor final class`. `maxParallel =
+  max(1, min(cpuCount, 4))` (clamp от 0). Хранит активные слоты как
+  `[UUID: ActiveSlot { pending, task }]`, методы `dispatch()` (запуск
+  совместимых до заполнения слотов), `waitUntilQuiescent() async`
+  (тесты/shutdown), `pickCompatibleQueuedJob() -> PendingJob?`
+  (детерминистическое тестирование). Тест-хук `markActive(_:destination:)`.
+- `ArchiveJob.defaultDestination: URL` — вынесен из `Scheduler` в
+  `Domain/ArchiveJob.swift`, чтобы UI/Stage 8 переиспользовали без
+  расхождений.
+- `JobState.isAwaitingPassword` — новый хелпер для `CompatibilityPredicate`.
+- `QueueDriver` удалён вместе со своими тестами; его инварианты
+  покрыты `Stage3ExtendedTests` через `Scheduler.dispatch + waitUntilQuiescent`.
+
+**Зафиксированные дизайн-решения:**
+- **SSD-эвристика v1:** SystemVolumeProbe считает любой internal том
+  `.ssd`, кроме случая когда `volumeLocalizedFormatDescription`
+  содержит "Fusion" (легаси Intel Fusion drive → `.unknown` → serial).
+  Полноценный IOKit + DiskArbitration probe — задача v1.1.
+- **Сравнение destination через `.path`:** `URL.==` чувствительно к
+  trailing slash; `URL(fileURLWithPath: "/tmp/x")` и
+  `URL(.../x/y.zip).deletingLastPathComponent()` дают разные URL для
+  одной директории. Сравниваем через `standardizedFileURL.path`.
+- **`maxParallel` статический потолок:** соответствует решению из
+  decisions.md (2026-06-22 «Параллельная распаковка»). Без динамики
+  на Low Power Mode и т.п. — лишний шум, прирост сомнителен.
+- **`markActive` оставлен как internal test hook:** видим только тест-таргету
+  через `@testable`; production-views его не используют. Gate под
+  `#if DEBUG` не делаем — overkill для одного типа в внутреннем модуле.
+
+**Тесты:** 6 TDD-минимум + 11 расширенных = 17 новых в
+`Stage3{,Extended}Tests`. Минус 3 удалённых QueueDriver-теста.
+Полный набор приложения: 49/49 зелёные. Newtua-пакет: 20/20 зелёные.
+
+## 2026-06-23 — Stage 3: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента. Принято к исправлению:
+- **`defaultDestination` дублировался в Scheduler и нигде больше не жил**
+  — вынесен в `ArchiveJob.defaultDestination`. Pick + launch теперь
+  делят один источник через `PendingJob`.
+- **`SystemVolumeProbe` без кеша** (план явно требовал «cache by mount
+  path») — добавлен внутренний `[String: Reading]` под
+  `OSAllocatedUnfairLock`. Ключ — `volumeURL.path`. Снимает O(N×M)
+  syscall'ы при больших очередях.
+- **Эвристика SSD не учитывала Intel Fusion** — добавлена проверка
+  `volumeLocalizedFormatDescription` на «fusion», такие тома → `.unknown`
+  (serial, безопасный fallback).
+- **`areCompatible` 5 positional params** — заменено на `(PendingJob,
+  PendingJob, probe)`. Call sites читаются лучше, pick/launch делят
+  один объект.
+- **`StubProbe` cross-file usage без документа** — добавлен
+  one-line комментарий «shared with Stage3ExtendedTests».
+
+**Отклонено:**
+- Gate `markActive` под `#if DEBUG` — utility internal в test-target,
+  не leak за пределы модуля; усложнение без выгоды.
+- `cancelAll()` для shutdown — задача UI-слоя (Stage 4+), не Stage 3.
+- Дополнительные allocations-микрооптимизации в `areCompatible` —
+  после введения `PendingJob` destinations вычисляются один раз на
+  кандидата; остальное — мизер.
+- `waitUntilQuiescent` ratio — корректен под MainActor (ревью-агент
+  сам подтвердил после анализа).
+
+**Повторный прогон:** 49/49 в `NewTheUnarchiverTests` зелёные.

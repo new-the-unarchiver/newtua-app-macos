@@ -101,55 +101,6 @@ struct Stage2ExtendedTests {
         #expect(report.extracted == 1)
     }
 
-    // MARK: - QueueDriver — sequential drain
-
-    @Test("QueueDriver drains an empty queue without error")
-    func driver_emptyQueue_noop() async {
-        let app = AppModel()
-        let driver = QueueDriver(model: app)
-        await driver.drain()
-        #expect(app.queue.isEmpty)
-    }
-
-    @Test("QueueDriver drains every queued job to .succeeded")
-    func driver_drainsAllJobs_toSucceeded() async throws {
-        // Copy fixtures into a writable temp dir so the default "next to
-        // archive" destination strategy lands inside our sandbox-friendly tmp.
-        let tmp = try TestSupport.makeTempDir()
-        defer { try? FileManager.default.removeItem(at: tmp) }
-        let h7z = tmp.appendingPathComponent("hello.7z")
-        let hrar = tmp.appendingPathComponent("hello.rar")
-        try FileManager.default.copyItem(at: TestSupport.fixture("hello.7z"), to: h7z)
-        try FileManager.default.copyItem(at: TestSupport.fixture("hello.rar"), to: hrar)
-
-        let app = AppModel()
-        app.enqueue(urls: [h7z, hrar])
-        #expect(app.queue.count == 2)
-
-        let driver = QueueDriver(model: app)
-        await driver.drain()
-
-        for job in app.queue {
-            if case .succeeded = job.state { continue }
-            Issue.record("Job \(job.url.lastPathComponent) not in .succeeded: \(job.state)")
-        }
-    }
-
-    @Test("QueueDriver skips jobs already in a terminal state")
-    func driver_skipsTerminalJobs() async throws {
-        let app = AppModel()
-        app.enqueue(urls: [TestSupport.fixture("hello.7z")])
-        let pre = try #require(app.queue.first)
-        // Pre-mark the only job as cancelled — driver should leave it alone.
-        pre.cancel()
-        #expect(pre.state == .cancelled)
-
-        let driver = QueueDriver(model: app)
-        await driver.drain()
-
-        #expect(pre.state == .cancelled)
-    }
-
     // MARK: - ProgressThrottle — unit edges
 
     @Test("ProgressThrottle emits the first tick immediately, then respects the interval")
