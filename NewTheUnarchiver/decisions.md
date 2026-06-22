@@ -340,3 +340,81 @@ git-коммитом сразу после прохождения шага 10 м
 
 **Повторный прогон:** 17/17 в `NewTheUnarchiverTests` зелёные;
 20/20 в Newtua-пакете зелёные.
+
+## 2026-06-23 — Этап 2 завершён
+
+Движок очереди (последовательная распаковка одной задачи за раз):
+- `Engine/JobRunner.swift` — `@MainActor` обёртка над одним `ArchiveJob`.
+  Держит личный `DispatchQueue(label: "newtua.job.<uuid>")`, на нём
+  открывает `Archive` и зовёт sync `extract`. Прогресс прокачивается
+  через `ProgressThrottle` (на той же queue), эмиты хопаются на main
+  через `DispatchQueue.main.async`. На вход — `destination`,
+  `ExtractionOptions`, опциональный `password`. На выход — `run() async`
+  без бросков: все исходы (включая `.encrypted`/`.wrongPassword`/`.io`/
+  `.cancelled`) попадают в `job.state`.
+- `Engine/ProgressThrottle.swift` — буферизация тиков прогресса с двумя
+  правилами коалесинга: (1) `started`/`finished` всегда эмитятся,
+  (2) идентичные подряд значения (`==`) подавляются. Между ними —
+  обычный rate-limit ~24 Гц через инжектируемое время для тестов.
+- `Engine/QueueDriver.swift` — последовательный drain очереди по
+  cursor-индексу: задачи, добавленные во время drain'а, подхватываются
+  автоматически. Стадия 3 заменит этот драйвер планировщиком
+  совместимости.
+
+**Аддитивные правки `Newtua`:** у `Progress` появился публичный
+memberwise `init` и `Equatable` — нужны для тестирования троттла и для
+правила коалесинга «идентичный тик подавляем».
+
+**Тесты:** 17 новых в `NewTheUnarchiverTests` (4 TDD-минимум + 13
+расширенных). Полный набор приложения: 34/34 зелёные. Newtua-пакет:
+20/20 зелёные. Сборка проекта через `xcodebuild test` — без ошибок.
+
+## 2026-06-23 — Stage 2: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента (reuse / quality / efficiency).
+Принято к исправлению:
+- **Гонка в `ProgressThrottle`**: `feed` зовётся с job-queue, `flush()`
+  — с main actor; класс non-Sendable, два потока на одних полях. Фикс
+  — перенести `flush()` внутрь `queue.async` блока после `extract`,
+  чтобы и feed, и flush шли с одной очереди.
+- **No-op прогресс хопал на main**: `feed` теперь возвращает `nil`,
+  если новое `Progress` равно последнему эмитнутому. Снижает работу в
+  hot-path и подавляет лишние rerender'ы `@Observable`.
+- **`QueueDriver.nextQueuedJob` стрингли-типизирован и O(n²)**: добавил
+  `JobState.isQueued`; drain переведён на cursor-индекс, что заодно
+  корректно подхватывает задачи, добавленные во время drain'а.
+- **Narrative-комментарии удалены** («Stage 2 only», «per § 5.2»,
+  «.always handled in stage 8», «stage 8 wires the strategy»). Оставлен
+  WHY-комментарий про non-thread-safe throttle.
+- **TestSupport-дубль** (с `bindings/swift/Tests/NewtuaTests/TestSupport.swift`)
+  отмечен явным комментарием «keep in sync»; общий пакет — overkill для
+  двух копий.
+
+**Зафиксированные дизайн-решения (без правок кода):**
+- **Async-API `Archive.extract` не используем в JobRunner.** Async-
+  вариант обёртки хопает каждый тик прогресса на main automatically,
+  что противоречит принятому в decisions.md решению (2026-06-22 —
+  «троттлинг на стороне ArchiveJob перед хопом на @MainActor»). Поэтому
+  JobRunner держит собственный sync-pipeline с троттлом до hop'a.
+  Двойной DispatchQueue (Newtua-овский для async + JobRunner-овский для
+  sync) принят как осознанная цена; lazy-вариант Newtua-queue был
+  отклонён ещё в Stage 0.
+- **`wrapperMode == .always` сейчас мапится так же, как `.onlyIfMultiple`**
+  (оба → `wrapper: true`), потому что C-ABI не различает. Полноценное
+  поведение «всегда оборачивать» — этап 8 (post-extract физическая
+  обёртка либо расширение ABI). TODO висит здесь.
+- **`defaultDestination` использует `nextToArchive`** независимо от
+  `ExtractionOptions.destinationStrategy`. Полная стратегия (включая
+  `.fixed`/`.askEachTime`) приходит в этап 8; до тех пор поле
+  `destinationStrategy` сохраняется в модели, но не считывается
+  драйвером.
+
+**Отклонено:**
+- Полностью переписать `JobRunner` на `Archive.extract(... async)` —
+  см. дизайн-решение выше.
+- Сделать `JobRunner` stateless с параметрами в `run()` — текущая форма
+  читается лучше, без выгоды.
+- Вынести `TestSupport` в общий target — overkill для двух копий.
+
+**Повторный прогон:** 34/34 в `NewTheUnarchiverTests` зелёные;
+20/20 в Newtua-пакете зелёные.
