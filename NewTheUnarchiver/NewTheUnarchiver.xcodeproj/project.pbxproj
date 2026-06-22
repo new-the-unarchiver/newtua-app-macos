@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		4E8DD5BF2FE9852D006C49C2 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E8DD5BE2FE9852D006C49C2 /* Newtua */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		4E8DD59F2FE97BB5006C49C2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E8DD5BF2FE9852D006C49C2 /* Newtua in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -78,6 +83,7 @@
 				4E8DD5912FE97BB4006C49C2 /* NewTheUnarchiver */,
 				4E8DD5A12FE97BB5006C49C2 /* NewTheUnarchiverTests */,
 				4E8DD5AB2FE97BB5006C49C2 /* NewTheUnarchiverUITests */,
+				4E8DD5BD2FE9852D006C49C2 /* Frameworks */,
 				4E8DD5902FE97BB4006C49C2 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -92,6 +98,13 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		4E8DD5BD2FE9852D006C49C2 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -99,6 +112,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4E8DD5B22FE97BB5006C49C2 /* Build configuration list for PBXNativeTarget "NewTheUnarchiver" */;
 			buildPhases = (
+				4E8DD5BC2FE9835C006C49C2 /* Run Script */,
 				4E8DD58B2FE97BB4006C49C2 /* Sources */,
 				4E8DD58C2FE97BB4006C49C2 /* Frameworks */,
 				4E8DD58D2FE97BB4006C49C2 /* Resources */,
@@ -112,6 +126,7 @@
 			);
 			name = NewTheUnarchiver;
 			packageProductDependencies = (
+				4E8DD5BE2FE9852D006C49C2 /* Newtua */,
 			);
 			productName = NewTheUnarchiver;
 			productReference = 4E8DD58F2FE97BB4006C49C2 /* NewTheUnarchiver.app */;
@@ -195,6 +210,9 @@
 			);
 			mainGroup = 4E8DD5862FE97BB4006C49C2;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4E8DD5902FE97BB4006C49C2 /* Products */;
 			projectDirPath = "";
@@ -230,6 +248,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		4E8DD5BC2FE9835C006C49C2 /* Run Script */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Run Script";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "  set -euo pipefail\n  export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n  cd \"$(git -C \"$SRCROOT\" rev-parse --show-toplevel)\"\n  cargo build -p newtua-ffi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4E8DD58B2FE97BB4006C49C2 /* Sources */ = {
@@ -307,7 +347,7 @@
 				DEVELOPMENT_TEAM = 5FVC5YT2B5;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_NO_COMMON_BLOCKS = YES;
@@ -371,7 +411,7 @@
 				DEVELOPMENT_TEAM = 5FVC5YT2B5;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
@@ -400,8 +440,18 @@
 				DEVELOPMENT_TEAM = 5FVC5YT2B5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -432,8 +482,18 @@
 				DEVELOPMENT_TEAM = 5FVC5YT2B5;
 				ENABLE_APP_SANDBOX = YES;
 				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = NO;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SELECTED_FILES = readonly;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = NO;
+				ENABLE_USER_SELECTED_FILES = readwrite;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -573,6 +633,21 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../../bindings/swift;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		4E8DD5BE2FE9852D006C49C2 /* Newtua */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			productName = Newtua;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 4E8DD5872FE97BB4006C49C2 /* Project object */;
 }
