@@ -22,6 +22,9 @@ enum JobState: Sendable, Equatable {
         }
     }
 
+    /// Permissive: only blocks leaving terminal states. The runner is the
+    /// authority on target-specific validity (e.g. `.queued → .succeeded`
+    /// without `.running` is allowed here but the runner won't issue it).
     func canTransition(to next: JobState) -> Bool {
         !isTerminal
     }
