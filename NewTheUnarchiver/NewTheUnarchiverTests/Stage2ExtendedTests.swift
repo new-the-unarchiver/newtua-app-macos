@@ -64,13 +64,7 @@ struct Stage2ExtendedTests {
         let runner = JobRunner(job: job, destination: dest)
         await runner.run()
 
-        guard case .failed(let code) = job.state else {
-            Issue.record("Expected .failed, got \(job.state)")
-            return
-        }
-        // Engine maps missing file to either Io or UnknownFormat depending on
-        // when the open path discovers the absence. Both are acceptable.
-        #expect(code == .io || code == .unknownFormat)
+        #expect(job.state == .failed(.io))
     }
 
     @Test("Runner reports needsPassword(.wrongPassword) when password is wrong")
@@ -117,8 +111,8 @@ struct Stage2ExtendedTests {
         #expect(app.queue.isEmpty)
     }
 
-    @Test("QueueDriver runs queued jobs sequentially")
-    func driver_runsAllJobs_sequentially() async throws {
+    @Test("QueueDriver drains every queued job to .succeeded")
+    func driver_drainsAllJobs_toSucceeded() async throws {
         // Copy fixtures into a writable temp dir so the default "next to
         // archive" destination strategy lands inside our sandbox-friendly tmp.
         let tmp = try TestSupport.makeTempDir()
@@ -162,34 +156,19 @@ struct Stage2ExtendedTests {
     func throttle_firstTick_emitsImmediately() {
         var now = Date(timeIntervalSinceReferenceDate: 100)
         let throttle = ProgressThrottle(intervalHz: 24, now: { now })
-        let p1 = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 1,
-            entrySize: 1000, started: false, finished: false
-        )
-        let p2 = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 2,
-            entrySize: 1000, started: false, finished: false
-        )
-        let p3 = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 3,
-            entrySize: 1000, started: false, finished: false
-        )
-        #expect(throttle.feed(p1) != nil)
+        #expect(throttle.feed(TestSupport.tick(bytes: 1)) != nil)
         // Same instant, different value → throttled by interval
-        #expect(throttle.feed(p2) == nil)
+        #expect(throttle.feed(TestSupport.tick(bytes: 2)) == nil)
         // Cross the interval → emits the next changed value
         now = Date(timeIntervalSinceReferenceDate: 100 + 1.0/24.0 + 0.001)
-        #expect(throttle.feed(p3) != nil)
+        #expect(throttle.feed(TestSupport.tick(bytes: 3)) != nil)
     }
 
     @Test("ProgressThrottle coalesces identical consecutive values (no-op suppression)")
     func throttle_identicalValues_coalesced() {
         var now = Date(timeIntervalSinceReferenceDate: 0)
         let throttle = ProgressThrottle(intervalHz: 24, now: { now })
-        let p = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 5,
-            entrySize: 10, started: false, finished: false
-        )
+        let p = TestSupport.tick(bytes: 5, of: 10)
         #expect(throttle.feed(p) != nil)
         // Past the interval, but value unchanged → still nil (no-op suppress).
         now = Date(timeIntervalSinceReferenceDate: 10)
@@ -200,42 +179,29 @@ struct Stage2ExtendedTests {
     func throttle_startedFinished_alwaysEmit() {
         var now = Date(timeIntervalSinceReferenceDate: 0)
         let throttle = ProgressThrottle(intervalHz: 24, now: { now })
-        let started = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 0,
-            entrySize: 10, started: true, finished: false
-        )
-        let mid = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 5,
-            entrySize: 10, started: false, finished: false
-        )
-        let finished = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 10,
-            entrySize: 10, started: false, finished: true
-        )
-        #expect(throttle.feed(started) != nil)
+        #expect(throttle.feed(TestSupport.tick(bytes: 0, of: 10, started: true)) != nil)
         now = Date(timeIntervalSinceReferenceDate: 0.001)
-        #expect(throttle.feed(mid) == nil, "mid tick within interval must be throttled")
+        #expect(
+            throttle.feed(TestSupport.tick(bytes: 5, of: 10)) == nil,
+            "mid tick within interval must be throttled"
+        )
         now = Date(timeIntervalSinceReferenceDate: 0.002)
-        #expect(throttle.feed(finished) != nil, "finished tick must always emit")
+        #expect(
+            throttle.feed(TestSupport.tick(bytes: 10, of: 10, finished: true)) != nil,
+            "finished tick must always emit"
+        )
     }
 
     @Test("ProgressThrottle.flush returns the latest buffered tick exactly once")
     func throttle_flush_returnsBuffered() {
         var now = Date(timeIntervalSinceReferenceDate: 0)
         let throttle = ProgressThrottle(intervalHz: 24, now: { now })
-        let first = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 1,
-            entrySize: 100, started: false, finished: false
-        )
-        let second = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 2,
-            entrySize: 100, started: false, finished: false
-        )
-        _ = throttle.feed(first)  // emits, lastEmit = 0
+        let first = TestSupport.tick(bytes: 1, of: 100)
+        let second = TestSupport.tick(bytes: 2, of: 100)
+        _ = throttle.feed(first)
         now = Date(timeIntervalSinceReferenceDate: 0.001)
-        #expect(throttle.feed(second) == nil)  // throttled, buffered
-        let flushed = throttle.flush()
-        #expect(flushed == second)
+        #expect(throttle.feed(second) == nil)
+        #expect(throttle.flush() == second)
         #expect(throttle.flush() == nil)
     }
 
@@ -243,23 +209,12 @@ struct Stage2ExtendedTests {
     func throttle_emitsLatestSnapshot_afterInterval() {
         var now = Date(timeIntervalSinceReferenceDate: 0)
         let throttle = ProgressThrottle(intervalHz: 24, now: { now })
-        let a = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 1,
-            entrySize: 100, started: false, finished: false
-        )
-        let b = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 50,
-            entrySize: 100, started: false, finished: false
-        )
-        _ = throttle.feed(a)
+        _ = throttle.feed(TestSupport.tick(bytes: 1, of: 100))
         now = Date(timeIntervalSinceReferenceDate: 0.001)
-        #expect(throttle.feed(b) == nil)  // buffered
+        #expect(throttle.feed(TestSupport.tick(bytes: 50, of: 100)) == nil)
         // Past interval — next feed emits the most recent value (latest).
         now = Date(timeIntervalSinceReferenceDate: 1.0)
-        let c = Newtua.Progress(
-            index: 0, path: "a", bytesWritten: 75,
-            entrySize: 100, started: false, finished: false
-        )
+        let c = TestSupport.tick(bytes: 75, of: 100)
         #expect(throttle.feed(c) == c)
     }
 }

@@ -48,44 +48,30 @@ final class JobRunner {
         let job = self.job
 
         do {
-            let archive = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<Archive, Error>) in
-                queue.async {
-                    do {
-                        cont.resume(returning: try Archive(path: path, password: pw))
-                    } catch {
-                        cont.resume(throwing: error)
-                    }
-                }
+            let archive = try await onQueue {
+                try Archive(path: path, password: pw)
             }
-
-            let report = try await withCheckedThrowingContinuation { (cont: CheckedContinuation<ExtractReport, Error>) in
-                queue.async {
-                    do {
-                        let report = try archive.extract(
-                            to: destPath,
-                            wrapper: wrapper,
-                            cancellation: token,
-                            progress: { p in
-                                // Called on `queue`. Throttle here, then hop
-                                // to main to update the observable job.
-                                guard let emit = throttle.feed(p) else { return }
-                                DispatchQueue.main.async {
-                                    job.recordProgress(emit)
-                                }
-                            }
-                        )
-                        // Flush the final buffered tick on the same queue
-                        // `feed` ran on — throttle is not thread-safe.
-                        if let tail = throttle.flush() {
-                            DispatchQueue.main.async {
-                                job.recordProgress(tail)
-                            }
+            let report = try await onQueue {
+                let r = try archive.extract(
+                    to: destPath,
+                    wrapper: wrapper,
+                    cancellation: token,
+                    progress: { p in
+                        // Called on `queue`. Throttle here, drop ticks issued
+                        // after cancellation, then hop to main.
+                        guard let emit = throttle.feed(p), !token.isCancelled
+                        else { return }
+                        DispatchQueue.main.async {
+                            job.recordProgress(emit)
                         }
-                        cont.resume(returning: report)
-                    } catch {
-                        cont.resume(throwing: error)
+                    }
+                )
+                if let tail = throttle.flush(), !token.isCancelled {
+                    DispatchQueue.main.async {
+                        job.recordProgress(tail)
                     }
                 }
+                return r
             }
 
             if report.aborted {
@@ -104,6 +90,20 @@ final class JobRunner {
             }
         } catch {
             job.updateState(.failed(.panic))
+        }
+    }
+
+    /// Run `body` on the job's serial DispatchQueue and bridge the result
+    /// back to the calling `async` context. Centralises the
+    /// `withCheckedThrowingContinuation + queue.async` pattern.
+    private func onQueue<T: Sendable>(
+        _ body: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { (cont: CheckedContinuation<T, Error>) in
+            queue.async {
+                do { cont.resume(returning: try body()) }
+                catch { cont.resume(throwing: error) }
+            }
         }
     }
 

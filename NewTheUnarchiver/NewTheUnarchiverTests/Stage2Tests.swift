@@ -72,15 +72,7 @@ struct Stage2Tests {
         for i in 0..<1000 {
             // 1ms steps → 1000 ticks across 1 second
             fakeNow = Date(timeIntervalSinceReferenceDate: Double(i) / 1000.0)
-            let p = Newtua.Progress(
-                index: 0,
-                path: "a.txt",
-                bytesWritten: UInt64(i),
-                entrySize: 1000,
-                started: false,
-                finished: false
-            )
-            if throttle.feed(p) != nil { emits += 1 }
+            if throttle.feed(TestSupport.tick(bytes: UInt64(i))) != nil { emits += 1 }
         }
         #expect(emits <= 25, "Got \(emits) emits, expected ≤ 25 under a 24Hz cap")
     }

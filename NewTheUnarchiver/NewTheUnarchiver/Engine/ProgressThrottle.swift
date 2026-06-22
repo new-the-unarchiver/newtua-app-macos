@@ -6,15 +6,17 @@ import Newtua
 /// usefully render — anything above ~24 Hz is wasted work.
 ///
 /// Not thread-safe by itself: the caller (a serial DispatchQueue per job) is
-/// expected to serialize `feed`/`flush` calls.
-final class ProgressThrottle {
+/// expected to serialize `feed`/`flush` calls. `@unchecked Sendable` is the
+/// asserted form of that contract — it lets the throttle be captured by the
+/// engine's `@Sendable` progress closure without lockless cross-thread access.
+final class ProgressThrottle: @unchecked Sendable {
     private let interval: TimeInterval
-    private let now: () -> Date
+    private let now: @Sendable () -> Date
     private var lastEmit: Date
     private var lastEmitted: Newtua.Progress?
     private var buffered: Newtua.Progress?
 
-    init(intervalHz: Double = 24, now: @escaping () -> Date = Date.init) {
+    init(intervalHz: Double = 24, now: @escaping @Sendable () -> Date = Date.init) {
         self.interval = 1.0 / intervalHz
         self.now = now
         self.lastEmit = .distantPast
@@ -31,15 +33,16 @@ final class ProgressThrottle {
     ///   `@Observable` observers).
     func feed(_ p: Newtua.Progress) -> Newtua.Progress? {
         if p.started || p.finished {
-            return emit(p)
+            return emit(p, at: now())
         }
         if p == lastEmitted {
             buffered = nil
             return nil
         }
         buffered = p
-        if now().timeIntervalSince(lastEmit) >= interval {
-            return emit(p)
+        let t = now()
+        if t.timeIntervalSince(lastEmit) >= interval {
+            return emit(p, at: t)
         }
         return nil
     }
@@ -51,11 +54,11 @@ final class ProgressThrottle {
             buffered = nil
             return nil
         }
-        return emit(p)
+        return emit(p, at: now())
     }
 
-    private func emit(_ p: Newtua.Progress) -> Newtua.Progress {
-        lastEmit = now()
+    private func emit(_ p: Newtua.Progress, at t: Date) -> Newtua.Progress {
+        lastEmit = t
         lastEmitted = p
         buffered = nil
         return p

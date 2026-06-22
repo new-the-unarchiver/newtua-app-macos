@@ -1,4 +1,5 @@
 import Foundation
+import Newtua
 
 /// Shared scaffolding for app-side tests: fixture locations and temp-dir helpers.
 ///
@@ -28,5 +29,25 @@ enum TestSupport {
             .appendingPathComponent("\(prefix)-\(UUID().uuidString)")
         try FileManager.default.createDirectory(at: url, withIntermediateDirectories: true)
         return url
+    }
+
+    /// Build a `Newtua.Progress` snapshot with sensible defaults — cuts the
+    /// constructor noise in throttle tests.
+    static func tick(
+        bytes: UInt64,
+        of size: UInt64 = 1000,
+        index: Int = 0,
+        path: String = "a",
+        started: Bool = false,
+        finished: Bool = false
+    ) -> Newtua.Progress {
+        Newtua.Progress(
+            index: index,
+            path: path,
+            bytesWritten: bytes,
+            entrySize: size,
+            started: started,
+            finished: finished
+        )
     }
 }
