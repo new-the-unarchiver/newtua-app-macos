@@ -3,20 +3,14 @@ import Foundation
 /// A job-in-flight (or candidate) paired with its resolved destination.
 /// Bundling them removes a positional-parameter footgun and keeps pick/launch
 /// from re-deriving the destination independently.
-///
-/// `destinationKey` is `destination.standardizedFileURL.path` precomputed
-/// once at construction — the predicate compares strings instead of
-/// re-allocating standardized URLs on every pair check.
 @MainActor
 struct PendingJob {
     let job: ArchiveJob
     let destination: URL
-    let destinationKey: String
 
     init(job: ArchiveJob, destination: URL) {
         self.job = job
         self.destination = destination
-        self.destinationKey = destination.standardizedFileURL.path
     }
 
     /// Convenience: use the job's default ("next to archive") destination.
@@ -27,18 +21,19 @@ struct PendingJob {
 
 /// Pure compatibility check: can two jobs run in parallel?
 ///
-/// Returns `false` (blocks parallel) when any of these hold (per
-/// `decisions.md` 2026-06-22 "Параллельная распаковка"):
-/// - The two destinations match (FS contention, wrapper-folder races).
+/// Returns `false` (blocks parallel) when any of these hold:
 /// - Either job is awaiting password input — that's a natural
 ///   serialisation point and the user has to act before progress.
 /// - Either source URL is on an external volume, an HDD, or a volume the
 ///   probe can't classify (`.unknown` falls back to serial — safe default).
+///
+/// Same-destination is NOT a blocker: APFS handles concurrent writes to
+/// the same parent directory fine, and the per-archive wrapper folders
+/// are named after the archive so cross-archive collisions are vanishingly
+/// rare. The original Unarchiver didn't parallelise at all — we trade an
+/// over-cautious wrapper-name race for a real UX win on M-series machines.
 @MainActor
 func areCompatible(_ a: PendingJob, _ b: PendingJob, probe: VolumeProbing) -> Bool {
-    if a.destinationKey == b.destinationKey {
-        return false
-    }
     if a.job.state.isAwaitingPassword || b.job.state.isAwaitingPassword {
         return false
     }

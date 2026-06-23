@@ -45,12 +45,12 @@ struct Stage3Tests {
         #expect(!areCompatible(a, b, probe: unknownB))
     }
 
-    @Test("Predicate blocks parallel if jobs share the same destination folder")
-    func predicate_blocksParallel_ifSameDestination() {
+    @Test("Predicate allows parallel even when jobs share the same destination folder")
+    func predicate_allowsParallel_ifSameDestination() {
         let dest = URL(fileURLWithPath: "/tmp/out")
         let a = PendingJob(job: ArchiveJob(url: URL(fileURLWithPath: "/tmp/a.zip")), destination: dest)
         let b = PendingJob(job: ArchiveJob(url: URL(fileURLWithPath: "/tmp/b.zip")), destination: dest)
-        #expect(!areCompatible(a, b, probe: StubProbe()))
+        #expect(areCompatible(a, b, probe: StubProbe()))
     }
 
     @Test("Predicate blocks parallel if either job is awaiting password input")
@@ -99,25 +99,21 @@ struct Stage3Tests {
     @Test("Scheduler picks the first compatible queued job when a slot opens")
     func scheduler_picksFirstCompatible_fromQueue() {
         let app = AppModel()
-        // Three URLs: a, b, c. a/b share destination → block each other.
-        // b/c also share. a/c are compatible.
-        let dirAB = URL(fileURLWithPath: "/tmp/shared")
-        let aURL = dirAB.appendingPathComponent("a.zip")
-        let bURL = dirAB.appendingPathComponent("b.zip")
-        let cURL = URL(fileURLWithPath: "/tmp/elsewhere/c.zip")
-        app.enqueue(urls: [aURL, bURL, cURL])
-
-        let probe = StubProbe()
+        // Three queued URLs in separate folders. The middle archive sits on
+        // an external volume, so it can't run in parallel; pick must skip
+        // it and return the third.
+        let urls = (0..<3).map { URL(fileURLWithPath: "/tmp/dir\($0)/x.zip") }
+        app.enqueue(urls: urls)
+        let probe = StubProbe(overrides: [
+            urls[1].standardizedFileURL: (isInternal: false, medium: .ssd)
+        ])
         let scheduler = Scheduler(model: app, probe: probe, maxParallel: 4, cpuCount: { 4 })
 
-        // Simulate: a is running.
-        let a = app.queue[0]
-        a.updateState(.running)
-        scheduler.markActive(a, destination: dirAB)
+        let zero = app.queue[0]
+        zero.updateState(.running)
+        scheduler.markActive(zero, destination: zero.defaultDestination)
 
-        // Pick next compatible — should be c (b would clash with a's dest).
         let picked = scheduler.pickCompatibleQueuedJob()
-        #expect(picked?.job.url == cURL.standardizedFileURL)
-        #expect(picked?.destination == cURL.standardizedFileURL.deletingLastPathComponent())
+        #expect(picked?.job.url == urls[2].standardizedFileURL)
     }
 }

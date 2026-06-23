@@ -652,3 +652,82 @@ sandbox-ится, distribution — вне Mac App Store.
 
 **Тесты:** 2 новых в `Stage4ExtendedTests` (срабатывание с delay, no-op
 при `nil`). Полный набор: 70/70 зелёные.
+
+## 2026-06-23 — Общий прогресс по архиву вместо «бара на каждый файл»
+
+При ручной проверке Stage 4 стало видно, что прогресс-бар в строке
+очереди пересчитывается **для каждой entry внутри архива**
+(`bytesWritten / entrySize`). На архиве из десятков файлов бар прыгает
+0→100 десятки раз — выглядит «сломанным». Поведение оригинала и
+устоявшихся macOS-приложений (Finder, Safari, Music) — один бар на весь
+процесс + текст пути.
+
+**Сделано:**
+- `ArchiveJob.overallFraction: Double?` — наблюдаемое 0…1 на весь архив,
+  `nil` пока entries неизвестны (фолбэк на indeterminate-спиннер).
+- `ArchiveJob.setEntries(sizes:)` — `JobRunner` зовёт один раз после
+  `Archive(path:)`, передавая `archive.entries().map(\.size)`. Внутри
+  считаются кумулятивные оффсеты по entry, сумма становится `totalBytes`.
+- `recordProgress` дополнительно вычисляет `overallFraction =
+  min(1.0, (offsets[index] + bytesWritten) / totalBytes)`. Монотонный
+  guard на случай stale-тика из прошлой entry.
+- `JobRowDisplay.progressFraction` теперь читает `job.overallFraction`.
+- Составной бар (общий + per-entry) обсуждался и отклонён: per-entry
+  на типичных архивах из мелких файлов «пульсирует» 0→100 несколько раз
+  в секунду — визуальный шум, не информация.
+
+**Тесты:** 3 новых в `Stage4ExtendedTests` (аккумуляция через несколько
+entries, монотонность, `nil` пока `setEntries` не вызван). Обновлены
+`display_running_withProgress` и `display_running_unknownSize_noFraction`
+под новый источник fraction.
+
+## 2026-06-23 — Параллель: блокер «общая папка назначения» снят
+
+Ручная проверка на M1 Air показала: пользователь дропает несколько
+архивов из `~/Downloads/`, все ждут серийно. По прежнему предикату
+`areCompatible` блокировал параллель при совпадении
+`destination.standardizedFileURL.path`. На практике этот блокер
+избыточен — два разных архива пишут в разные пути (`a.zip → a/`,
+`b.zip → b/`); APFS переживает параллельные записи в одну директорию
+без проблем; коллизия имён внутри двух архивов крайне маловероятна.
+
+**Сделано:**
+- В `CompatibilityPredicate.areCompatible` убрана проверка
+  `destinationKey`. Остались актуальные блокеры: внешний/HDD-том,
+  ожидание пароля. `PendingJob.destinationKey` удалён за ненадобностью.
+- `Stage3Tests.predicate_blocksParallel_ifSameDestination` →
+  `predicate_allowsParallel_ifSameDestination`.
+- `Stage3ExtendedTests.predicate_destinationStandardization` удалён
+  (более не описывает поведение).
+- `Stage3ExtendedTests.scheduler_pickCompatible_noneAvailable`
+  перепиcан: вместо общей папки блокер ставится через `.needsPassword`.
+
+**Баг, всплывший при снятии блокера:** `Scheduler.dispatch` крутился в
+бесконечном цикле. `pickCompatibleQueuedJob` сразу после `launch`
+находил **ту же** задачу (Task ещё не успел переключить state в
+`.running`, поэтому она и `.queued`, и в `active`). Старый блокер по
+dest неявно отсекал «себя с собой». Фикс — явный фильтр по `active.keys`
+в `pickCompatibleQueuedJob`.
+
+**Тесты:** полный набор 72/72 зелёные после фикса. Ручная проверка
+параллели на M1 Air — следующий шаг.
+
+## 2026-06-23 — Тайм-ауты для тестов
+
+Несколько раз приходилось убивать висевшие `xcodebuild test`-сессии
+вручную (приложение нагревало CPU без прогресса). Чтобы Claude мог
+гонять тесты автономно:
+
+- Все вызовы `xcodebuild test` идут с флагами
+  `-test-timeouts-enabled YES -default-test-execution-time-allowance 30
+  -maximum-test-execution-time-allowance 60` — каждый тест получает
+  60-секундный «потолок», после которого test-runner убивает процесс и
+  репортит фейл, остальная сюита продолжает.
+- Параллельный запуск тестов отключён (`-parallel-testing-enabled NO`):
+  под нагрузкой MainActor-suite-ы упирались в неявные ожидания друг
+  друга. Серийный прогон стабилен.
+- Перед/после каждого прогона — `killall -9 NewTheUnarchiver xcodebuild
+  xctest` для гарантии отсутствия орфан-процессов.
+
+Эти флаги работают без правок `.xcscheme` / создания `.xctestplan` —
+xcodebuild уважает их напрямую.

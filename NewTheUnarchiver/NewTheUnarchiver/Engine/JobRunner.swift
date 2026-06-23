@@ -51,6 +51,10 @@ final class JobRunner {
             let archive = try await onQueue {
                 try Archive(path: path, password: pw)
             }
+            let entrySizes: [UInt64] = try await onQueue {
+                archive.entries().map(\.size)
+            }
+            job.setEntries(sizes: entrySizes)
             let report = try await onQueue {
                 let r = try archive.extract(
                     to: destPath,

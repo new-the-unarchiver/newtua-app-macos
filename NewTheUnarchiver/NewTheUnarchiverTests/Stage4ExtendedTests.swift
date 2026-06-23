@@ -42,14 +42,55 @@ struct Stage4ExtendedTests {
 
     // MARK: - JobRowDisplay — edges
 
-    @Test("JobRowDisplay shows no progress fraction when entry size is unknown")
+    @Test("JobRowDisplay shows no progress fraction when total archive size is unknown")
     func display_running_unknownSize_noFraction() {
         let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/x.zip"))
         job.updateState(.running)
+        // No setEntries → totalBytes stays 0 → overall stays nil.
         job.recordProgress(TestSupport.tick(bytes: 100, of: 0, path: "a"))
         let d = JobRowDisplay(job: job)
         #expect(d.progressFraction == nil)
         #expect(d.subtitleKind == .running(currentPath: "a"))
+    }
+
+    // MARK: - ArchiveJob overall progress aggregation
+
+    @Test("ArchiveJob.recordProgress aggregates per-entry ticks into one archive-wide fraction")
+    func overall_aggregatesAcrossEntries() {
+        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/multi.zip"))
+        job.updateState(.running)
+        job.setEntries(sizes: [100, 100, 200])  // total 400
+        job.recordProgress(TestSupport.tick(bytes: 50, of: 100, index: 0, path: "a"))
+        #expect(job.overallFraction == 0.125)
+        job.recordProgress(TestSupport.tick(bytes: 100, of: 100, index: 0, path: "a", finished: true))
+        #expect(job.overallFraction == 0.25)
+        job.recordProgress(TestSupport.tick(bytes: 0, of: 100, index: 1, path: "b", started: true))
+        #expect(job.overallFraction == 0.25)
+        job.recordProgress(TestSupport.tick(bytes: 100, of: 100, index: 1, path: "b", finished: true))
+        #expect(job.overallFraction == 0.5)
+        job.recordProgress(TestSupport.tick(bytes: 200, of: 200, index: 2, path: "c", finished: true))
+        #expect(job.overallFraction == 1.0)
+    }
+
+    @Test("ArchiveJob.overallFraction never goes backwards even if a stale tick arrives")
+    func overall_isMonotonic() {
+        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/x.zip"))
+        job.updateState(.running)
+        job.setEntries(sizes: [100, 100])
+        job.recordProgress(TestSupport.tick(bytes: 100, of: 100, index: 1, path: "b"))
+        #expect(job.overallFraction == 1.0)
+        // A stale tick from an earlier entry — engine could in theory emit
+        // this; the monotonic guard keeps the bar at 1.0.
+        job.recordProgress(TestSupport.tick(bytes: 0, of: 100, index: 0, path: "a", started: true))
+        #expect(job.overallFraction == 1.0)
+    }
+
+    @Test("ArchiveJob.overallFraction is nil while no entries are registered")
+    func overall_nilUntilSetEntries() {
+        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/x.zip"))
+        job.updateState(.running)
+        job.recordProgress(TestSupport.tick(bytes: 50, of: 100))
+        #expect(job.overallFraction == nil)
     }
 
     @Test("JobRowDisplay carries the password-prompt reason from the job state")

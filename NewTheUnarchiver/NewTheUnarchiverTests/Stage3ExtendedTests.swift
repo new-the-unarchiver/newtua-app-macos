@@ -32,20 +32,6 @@ struct Stage3ExtendedTests {
 
     // MARK: - Predicate edges
 
-    @Test("Predicate ignores destination case differences via standardizedFileURL")
-    func predicate_destinationStandardization() {
-        let a = PendingJob(
-            job: ArchiveJob(url: URL(fileURLWithPath: "/tmp/a.zip")),
-            destination: URL(fileURLWithPath: "/tmp/out")
-        )
-        // Same path expressed two ways: with and without "./" and trailing slash.
-        let b = PendingJob(
-            job: ArchiveJob(url: URL(fileURLWithPath: "/tmp/b.zip")),
-            destination: URL(fileURLWithPath: "/tmp/./out/")
-        )
-        #expect(!areCompatible(a, b, probe: StubProbe()))
-    }
-
     @Test("Predicate is unaffected by terminal states on the other side")
     func predicate_terminalStateDoesNotBlock() {
         let aJob = ArchiveJob(url: URL(fileURLWithPath: "/tmp/a.zip"))
@@ -61,15 +47,18 @@ struct Stage3ExtendedTests {
 
     // MARK: - Scheduler — pick / cap
 
-    @Test("Scheduler returns nil when no queued job is compatible with any active")
+    @Test("Scheduler returns nil when the only active is awaiting password input")
     func scheduler_pickCompatible_noneAvailable() {
         let app = AppModel()
-        let dir = URL(fileURLWithPath: "/tmp/shared")
-        app.enqueue(urls: [dir.appendingPathComponent("a.zip"), dir.appendingPathComponent("b.zip")])
+        app.enqueue(urls: [
+            URL(fileURLWithPath: "/tmp/a/x.zip"),
+            URL(fileURLWithPath: "/tmp/b/y.zip"),
+        ])
         let s = Scheduler(model: app, probe: StubProbe(), maxParallel: 4)
         let a = app.queue[0]
         a.updateState(.running)
-        s.markActive(a, destination: dir)  // any candidate has same dest
+        a.updateState(.needsPassword(.encrypted))
+        s.markActive(a, destination: a.defaultDestination)
         #expect(s.pickCompatibleQueuedJob() == nil)
     }
 

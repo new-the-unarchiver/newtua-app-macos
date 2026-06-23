@@ -58,6 +58,7 @@ struct Stage4Tests {
     func display_running_withProgress() {
         let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/big.7z"))
         job.updateState(.running)
+        job.setEntries(sizes: [200])
         job.recordProgress(TestSupport.tick(bytes: 50, of: 200, path: "file.txt"))
         let d = JobRowDisplay(job: job)
         #expect(d.subtitleKind == .running(currentPath: "file.txt"))

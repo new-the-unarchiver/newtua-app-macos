@@ -30,7 +30,7 @@ struct JobRowDisplay: Equatable {
             self.showsCancelButton = true
         case .running:
             self.subtitleKind = .running(currentPath: job.progress?.path)
-            fraction = Self.fraction(from: job.progress)
+            fraction = job.overallFraction
             self.showsCancelButton = true
         case .needsPassword(let reason):
             self.subtitleKind = .needsPassword(reason)
@@ -49,10 +49,5 @@ struct JobRowDisplay: Equatable {
             self.showsCancelButton = false
         }
         self.progressFraction = fraction
-    }
-
-    private static func fraction(from progress: Newtua.Progress?) -> Double? {
-        guard let p = progress, p.entrySize > 0 else { return nil }
-        return Double(p.bytesWritten) / Double(p.entrySize)
     }
 }
