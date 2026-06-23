@@ -1477,3 +1477,200 @@ overkill. Принято к исправлению:
 - Отклонено: предложение убрать `tlic_helloTxtZip_realPaths` как
   частично перекрывающий `tlic_macosx_skipped` — это якорь к
   реальному багу, ценность regression-guard сильнее.
+
+## 2026-06-23 — Этап 9: смена скоупа на Quick Look-плагин для Finder
+
+Исходный план этапа 9 («Space на строке очереди → превью первого
+файла») переосмыслен. Решено:
+
+- **Делаем Quick Look Preview Extension** (App Extension внутри
+  основного `.app`), которое срабатывает в Finder по Space на
+  поддерживаемом архиве. Внутри приложения превью не делаем —
+  очередь в 99% случаев пробегает быстро, и UI там не востребован.
+- **Контент превью — HTML-листинг дерева** содержимого архива:
+  иконки, имя, тип, дата модификации, размер. Без распаковки.
+- **API:** `QLPreviewProvider` + `QLPreviewingController.providePreview(for:)`,
+  возврат `QLPreviewReply(dataOfContentType: .html, ...)`. Иконки
+  файлов прикрепляются как `QLPreviewReplyAttachment` и ссылаются
+  через `cid:`-схему.
+
+**Зафиксированные правила рендера:**
+
+- **Иконки** — системные через `NSWorkspace.shared.icon(for: UTType)`,
+  кэшируются по UTI/расширению. Никаких эмодзи. Никаких SF Symbols.
+- **Колонки** — имя + иконка, тип (file/dir/symlink), дата
+  модификации (локализованная), размер (`ByteCountFormatter`).
+- **Раскрытие папок** — корень всегда полностью раскрыт; внутренние
+  узлы раскрыты, если у них ≤ 5 потомков, иначе свёрнуты. Реализация
+  через `<details open>`/`<details>` без JavaScript.
+- **Сайдкары macOS** (`__MACOSX/`, `.DS_Store`, `._*`) скрываются
+  из дерева — иначе человек видит мусор, который движок всё равно не
+  распаковывает.
+- **Зашифрованный архив** (header-encrypted, listing без пароля
+  невозможен) → показываем красивую статичную HTML-страницу
+  «архив запаролен» с системной иконкой замка (NSWorkspace), без
+  попытки запросить пароль (Quick Look по дизайну read-only).
+- **Двойной клик в QL-окне** уже работает системно: открывает архив
+  в нашем приложении и распаковка идёт по настройкам пользователя.
+  Никакого UI с действиями в самом превью не добавляем.
+
+**Архитектура (для тестируемости):**
+
+- `ArchiveTreeBuilder` — pure `(entries) -> [TreeNode]`. Группирует
+  плоский список путей в дерево, пропускает сайдкары, сортирует
+  директории перед файлами, лексикографически.
+- `ExpansionPolicy` — pure правило раскрытия (rootExpanded /
+  thresholdChildren).
+- `HTMLPreviewRenderer` — pure `(tree, locale) -> Data` (UTF-8 HTML).
+  Экранирует HTML-спецсимволы в путях (XSS-защита).
+- `IconCache` — `@MainActor` обёртка над `NSWorkspace.icon(for:)`,
+  возвращает PNG-данные для прикрепления как `QLPreviewReplyAttachment`.
+- `PreviewProvider` (в новом extension target) — тонкая обёртка:
+  открывает `Archive`, строит дерево, рендерит HTML, собирает
+  attachments, возвращает `QLPreviewReply`.
+
+**TDD-минимум** (в основном тест-таргете, без extension):
+
+- TreeBuilder: single file at root → один узел; shared root dir →
+  вложенное дерево; неявная промежуточная папка («foo/sub/a.txt»
+  без entry «foo/») → создаётся виртуальный folder; sidecars
+  пропускаются; директории сортируются перед файлами; explicit
+  `foo/` entry мерджится с содержимым.
+- ExpansionPolicy: корень всегда раскрыт; узел с ≤5 детей раскрыт;
+  с >5 — свёрнут.
+- HTMLPreviewRenderer: эмитит валидный HTML с DOCTYPE; экранирует
+  `<`, `>`, `&`, `"`; включает `ByteCountFormatter`-размер; включает
+  локализованную дату; пустой архив → пустое состояние; encrypted
+  fallback → статичная страница с локализованным текстом.
+
+**Скоуп v1 — что НЕ делаем:**
+
+- Поиск по дереву / `⌘F` (Quick Look по дизайну ограничен).
+- Сортировка по другим колонкам.
+- «Open this file inside the archive» (только через двойной клик
+  всего архива из QL → наше приложение → распаковка).
+- Selection / частичная распаковка через QL — Apple не даёт UI.
+
+**Что делаем сразу, что — следом:**
+
+- Сейчас: pure-Swift часть (TreeBuilder + ExpansionPolicy + Renderer)
+  + полный тестовый набор в `NewTheUnarchiverTests`.
+- Следом: новый extension target в Xcode (отдельный bundle с Info.plist
+  и `NSExtension` dict), линковка `Newtua` + Rust-статика, тонкая
+  обёртка `PreviewProvider`. Шаг 2 требует ручного добавления target в
+  Xcode UI — это разовая конфигурация, инструкция готовится отдельно.
+
+## 2026-06-23 — Этап 9: pure-Swift часть готова (TDD + simplify)
+
+**Что сделано:**
+
+- `QuickLook/PreviewInputEntry.swift` — engine-agnostic вход с конверсией
+  `Int64 mtime → Date` на границе.
+- `QuickLook/TreeNode.swift` — иммутабельный узел дерева
+  (`file`/`directory`/`symlink`) с тремя static-конструкторами для
+  выразительности тестов.
+- `QuickLook/ArchiveTreeBuilder.swift` — pure `(entries) → [TreeNode]`,
+  скрывает macOS-сайдкары, синтезирует промежуточные папки, сортирует
+  через `localizedStandardCompare` (dirs-before-files).
+- `QuickLook/ExpansionPolicy.swift` — порог раскрытия (`≤5` детей —
+  открыто, корень всегда открыт).
+- `QuickLook/HTMLPreviewRenderer.swift` — pure `(tree) → Data` (UTF-8
+  HTML5), `<details>/<summary>` без JS, экранирование с fast-path.
+- `Engine/MacOSSidecars.swift` — общий drop-list для `JobRunner` и
+  `ArchiveTreeBuilder` (вынесен из дублирования по результатам ревью).
+
+**Тесты:** `Stage9Tests.swift` (16 TDD-минимум) +
+`Stage9ExtendedTests.swift` (20 расширенных). Полный прогон проекта —
+**216/216 зелёные**, регрессий в этапах 1–8 нет.
+
+**Ревью (`/simplify`, три параллельных агента):**
+
+Принято и применено:
+- **Дубль sidecar-логики** (HIGH, reuse + quality): `isMacOSSidecar` в
+  `JobRunner` и `isSidecar` в `ArchiveTreeBuilder` — побайтно
+  идентичные предикаты. Вынесено в `MacOSSidecars.matches` (две
+  перегрузки: `String` и `Substring`), оба сайта вызывают общий
+  helper. Контракт «дроп-лист движка» теперь живёт в одном файле.
+- **`RenderContext` против парамлета** (HIGH, quality): три зависимости
+  (`policy`, `sizeStyle`, `dateFormatter`) ходили через 4 уровня
+  рекурсии. Завернул в `private struct RenderContext`, передаётся
+  одним аргументом.
+- **Пустые `<span></span>` через helper** (HIGH, quality): четыре
+  ветви `if let mtime/size / else` сводились к одному
+  `appendMetaSpan(class:text:)`. Добавлен короткий WHY-комментарий
+  «пустые spans нужны grid-колонкам».
+- **`inout String` + `reserveCapacity`** (HIGH, efficiency): рендер
+  больше не возвращает `String` из каждого `renderNode`, а пишет в
+  общий буфер. Резервируется capacity по числу узлов (~256 байт на
+  узел). Для 10K-entry архивов это убирает ~20K промежуточных
+  аллокаций.
+- **Fast-path в `escape`** (MEDIUM, efficiency): сначала проверяем
+  через `s.utf8`, есть ли вообще опасные байты (`&<>"'`). Если нет —
+  пишем строку как есть. В типичных архивах большинство имён без
+  спецсимволов, проход по `Character` не делается.
+- **`let kind` в `MutableNode`** (MEDIUM, quality): `kind` был `var`
+  ради `markDirectory`, но синтезированные узлы всегда `.directory`,
+  и leaf'ы никогда не превращаются в parent'ов. Промоушн невозможен
+  по построению — `var` снят, `markDirectory` упрощён до обновления
+  `mtime`.
+- **Сплющил `insert` через `makeChild`** (LOW, quality): switch по
+  `entry.kind` теперь в одном месте; `insert` стал линейным проходом
+  без вложенных условий.
+- **Инкрементальный `pathSoFar`** (LOW, efficiency): убран
+  `components[0...idx].joined()` на каждом уровне; путь строится
+  одной строкой по мере спуска. Экономит N×depth строковых
+  аллокаций.
+
+Отклонено (с обоснованием):
+- **Локализация HTML-строк** (MEDIUM, quality): захардкоженные
+  «File / Folder / Symlink / Archive is empty / This archive is
+  encrypted» — действительно нарушают сквозное правило RU+EN. Но
+  Quick Look extension живёт в **отдельном bundle** со своим
+  `Localizable.xcstrings`, и тащить ключи в основной бандл бессмысленно
+  до того, как extension target создан. Откладываю на шаг
+  «интеграция extension target»: создал target → добавил xcstrings →
+  перевёл захардкоженные литералы на `String(localized:bundle:)`.
+- **Фабрики `TreeNode.file/.directory/.symlink`** (MEDIUM, quality):
+  предложено заменить на единый `init` с `Kind`. Отклонено — 36
+  тестов активно используют фабрики, удобство выразительности
+  превышает потенциальную «двусмысленность». В тестах конструктор
+  `TreeNode.symlink(name: ..., size: 0, ...)` нормален — `size`
+  имеет смысл и для симлинков (длина target-пути), пусть и редко.
+- **`localizedStandardCompare` дорогой** (MEDIUM, efficiency):
+  предложено заменить на простой `<` для глубоких подкаталогов.
+  Отклонено — natural-order sort (`file2.txt` перед `file10.txt`)
+  явно требуется тестом и проявится на любом архиве с нумерованными
+  именами. Преждевременная оптимизация, ждём реальный сигнал лагания.
+- **Ручной `escape` посимвольный цикл** (LOW, quality): остаётся как
+  есть, корректно и предсказуемо; добавлен WHY-комментарий про
+  порядок (амперсанд первым) на случай будущей «оптимизации» через
+  `replacingOccurrences`.
+
+**Открыто (handoff):**
+
+Pure-Swift часть готова и закрыта тестами в основном таргете. Для
+завершения этапа 9 нужны **ручные шаги через Xcode UI**, которых нельзя
+автоматизировать через ассистента:
+
+1. **File ▸ New ▸ Target ▸ Quick Look Preview Extension** (macOS).
+   Имя — `NewTheUnarchiverQuickLook`, Bundle Identifier продолжает
+   ID основного приложения с суффиксом `.QuickLook`.
+2. Сгенерированный шаблон редактирует `PreviewProvider.swift` под
+   `QLPreviewProvider` — заменить тело на тонкую обёртку: открыть
+   `Archive`, конвертировать `Newtua.Entry → PreviewInputEntry`,
+   вызвать `ArchiveTreeBuilder.buildTree` и `HTMLPreviewRenderer.render`,
+   вернуть `QLPreviewReply(dataOfContentType: .html, contentSize: ...)`.
+3. В Info.plist extension target — `NSExtension` → `QLSupportedContentTypes`
+   = UTI всех поддерживаемых форматов (см. `SupportedFormats`).
+4. Link `Newtua` package в extension target (тот же local-package
+   reference, что и у основного).
+5. Скопировать cargo Run Script phase в extension target — иначе
+   `libnewtua_ffi.a` будет отсутствовать при первой сборке extension.
+6. На сборке `xcodebuild` + ручной тест в Finder: drop фикстуру на
+   рабочий стол → Space → должна появиться HTML-страница с деревом.
+7. После работающего extension — локализация захардкоженных HTML-строк
+   через `String(localized:bundle:)` с ключами в `Localizable.xcstrings`
+   extension target'а, на EN и RU.
+
+Шаги 1–7 — отдельная сессия (отдельный коммит). Pure-Swift код этого
+коммита уже зелёный, готов к подключению.

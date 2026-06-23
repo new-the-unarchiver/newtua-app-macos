@@ -185,20 +185,9 @@ final class JobRunner {
             guard let first = path.split(
                 separator: "/", maxSplits: 1, omittingEmptySubsequences: true
             ).first else { continue }
-            let component = String(first)
-            if isMacOSSidecar(component) { continue }
-            seen.insert(component)
+            if MacOSSidecars.matches(first) { continue }
+            seen.insert(String(first))
         }
         return seen.count
-    }
-
-    /// Case-sensitive by engine contract — engine matches these exact
-    /// names. APFS is case-sensitive only on opt-in volumes, but
-    /// archives can carry whatever bytes they want; we mirror the
-    /// engine so the count stays in lockstep with what actually lands.
-    nonisolated private static func isMacOSSidecar(_ component: String) -> Bool {
-        component == "__MACOSX"
-            || component == ".DS_Store"
-            || component.hasPrefix("._")
     }
 }
