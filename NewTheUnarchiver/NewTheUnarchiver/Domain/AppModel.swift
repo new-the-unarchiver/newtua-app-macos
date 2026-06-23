@@ -9,10 +9,8 @@ final class AppModel {
     var extractionOptions: ExtractionOptions = ExtractionOptions()
 
     /// How long a terminal row stays visible before it auto-removes. `nil`
-    /// disables auto-removal (used by unit tests that assert queue contents
-    /// after a drain). The app scene passes `1.2` — long enough for the
-    /// "Готово / Ошибка / Отменено" flash, short enough that the queue
-    /// clears on its own as in the original Unarchiver.
+    /// disables auto-removal — used by tests that assert queue contents
+    /// after a drain.
     let terminalDisplayDelay: TimeInterval?
 
     init(terminalDisplayDelay: TimeInterval? = nil) {
@@ -57,9 +55,8 @@ final class AppModel {
         }
     }
 
-    /// Called by `Scheduler` once a runner emits a terminal state. After
-    /// `terminalDisplayDelay` the row is dropped from the queue, matching
-    /// the original Unarchiver where completed rows fade out on their own.
+    /// Schedule the row to drop after `terminalDisplayDelay`. Mirrors the
+    /// original Unarchiver behaviour where completed rows fade away.
     func handleTerminal(_ job: ArchiveJob) {
         guard let delay = terminalDisplayDelay, delay > 0 else { return }
         Task { [weak self] in

@@ -22,16 +22,13 @@ struct PendingJob {
 /// Pure compatibility check: can two jobs run in parallel?
 ///
 /// Returns `false` (blocks parallel) when any of these hold:
-/// - Either job is awaiting password input — that's a natural
-///   serialisation point and the user has to act before progress.
+/// - Either job is awaiting password input — natural serialisation point.
 /// - Either source URL is on an external volume, an HDD, or a volume the
 ///   probe can't classify (`.unknown` falls back to serial — safe default).
 ///
-/// Same-destination is NOT a blocker: APFS handles concurrent writes to
-/// the same parent directory fine, and the per-archive wrapper folders
-/// are named after the archive so cross-archive collisions are vanishingly
-/// rare. The original Unarchiver didn't parallelise at all — we trade an
-/// over-cautious wrapper-name race for a real UX win on M-series machines.
+/// Same-destination is intentionally NOT a blocker (decisions.md): APFS
+/// handles concurrent writes to one directory, and wrapper folders are
+/// named after the archive so cross-archive name collisions are rare.
 @MainActor
 func areCompatible(_ a: PendingJob, _ b: PendingJob, probe: VolumeProbing) -> Bool {
     if a.job.state.isAwaitingPassword || b.job.state.isAwaitingPassword {

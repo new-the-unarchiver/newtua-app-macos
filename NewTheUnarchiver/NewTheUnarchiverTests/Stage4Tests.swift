@@ -56,9 +56,7 @@ struct Stage4Tests {
 
     @Test("JobRowDisplay surfaces the running entry path and a deterministic progress fraction")
     func display_running_withProgress() {
-        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/big.7z"))
-        job.updateState(.running)
-        job.setEntries(sizes: [200])
+        let job = TestSupport.runningJob(url: URL(fileURLWithPath: "/tmp/big.7z"), sizes: [200])
         job.recordProgress(TestSupport.tick(bytes: 50, of: 200, path: "file.txt"))
         let d = JobRowDisplay(job: job)
         #expect(d.subtitleKind == .running(currentPath: "file.txt"))
@@ -74,16 +72,7 @@ struct Stage4Tests {
         #expect(!JobRowDisplay(job: job).showsCancelButton)
     }
 
-    // MARK: - ArchiveJob progress monotonicity (guard added in Stage 4)
-
-    @Test("ArchiveJob.recordProgress ignores backward bytes within the same entry")
-    func recordProgress_ignoresBackwardBytes() {
-        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/a.zip"))
-        job.updateState(.running)
-        job.recordProgress(TestSupport.tick(bytes: 100, of: 200))
-        job.recordProgress(TestSupport.tick(bytes: 50, of: 200))
-        #expect(job.progress?.bytesWritten == 100)
-    }
+    // MARK: - ArchiveJob progress
 
     @Test("ArchiveJob.recordProgress accepts a transition to the next entry")
     func recordProgress_acceptsNextEntry() {

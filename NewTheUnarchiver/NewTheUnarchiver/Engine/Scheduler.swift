@@ -61,13 +61,11 @@ final class Scheduler {
     /// spinning up Tasks.
     func pickCompatibleQueuedJob() -> PendingJob? {
         let activePairs = Array(active.values.map(\.pending))
-        // A just-launched job's `Task` hasn't yet flipped its state to
-        // `.running`, so the job is still `.queued` AND already in `active`.
-        // Without this filter the dispatch loop would re-pick it on every
-        // iteration and spin forever.
-        let activeIDs = Set(active.keys)
         for job in model.queue {
-            guard job.state.isQueued, !activeIDs.contains(job.id) else { continue }
+            // A just-launched job's `Task` hasn't yet flipped its state to
+            // `.running`, so it stays `.queued` AND lives in `active`. Without
+            // skipping it here `dispatch` would re-pick it and spin forever.
+            guard job.state.isQueued, active[job.id] == nil else { continue }
             let candidate = PendingJob(job)
             let compatible = activePairs.allSatisfy { a in
                 areCompatible(a, candidate, probe: probe)

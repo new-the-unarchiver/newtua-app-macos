@@ -1,5 +1,6 @@
 import Foundation
 import Newtua
+@testable import NewTheUnarchiver
 
 /// Shared scaffolding for app-side tests: fixture locations and temp-dir helpers.
 ///
@@ -49,5 +50,18 @@ enum TestSupport {
             started: started,
             finished: finished
         )
+    }
+
+    /// Build a job already in `.running` with entry sizes registered —
+    /// the typical setup for any test that pokes `recordProgress`.
+    @MainActor
+    static func runningJob(
+        url: URL = URL(fileURLWithPath: "/tmp/test.zip"),
+        sizes: [UInt64]
+    ) -> ArchiveJob {
+        let job = ArchiveJob(url: url)
+        job.updateState(.running)
+        job.setEntries(sizes: sizes)
+        return job
     }
 }

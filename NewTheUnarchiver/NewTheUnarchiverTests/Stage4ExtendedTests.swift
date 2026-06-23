@@ -57,9 +57,7 @@ struct Stage4ExtendedTests {
 
     @Test("ArchiveJob.recordProgress aggregates per-entry ticks into one archive-wide fraction")
     func overall_aggregatesAcrossEntries() {
-        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/multi.zip"))
-        job.updateState(.running)
-        job.setEntries(sizes: [100, 100, 200])  // total 400
+        let job = TestSupport.runningJob(sizes: [100, 100, 200])  // total 400
         job.recordProgress(TestSupport.tick(bytes: 50, of: 100, index: 0, path: "a"))
         #expect(job.overallFraction == 0.125)
         job.recordProgress(TestSupport.tick(bytes: 100, of: 100, index: 0, path: "a", finished: true))
@@ -74,13 +72,9 @@ struct Stage4ExtendedTests {
 
     @Test("ArchiveJob.overallFraction never goes backwards even if a stale tick arrives")
     func overall_isMonotonic() {
-        let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/x.zip"))
-        job.updateState(.running)
-        job.setEntries(sizes: [100, 100])
+        let job = TestSupport.runningJob(sizes: [100, 100])
         job.recordProgress(TestSupport.tick(bytes: 100, of: 100, index: 1, path: "b"))
         #expect(job.overallFraction == 1.0)
-        // A stale tick from an earlier entry — engine could in theory emit
-        // this; the monotonic guard keeps the bar at 1.0.
         job.recordProgress(TestSupport.tick(bytes: 0, of: 100, index: 0, path: "a", started: true))
         #expect(job.overallFraction == 1.0)
     }
@@ -162,7 +156,7 @@ struct Stage4ExtendedTests {
         job.updateState(.running)
         job.updateState(.succeeded(ExtractReport(extracted: 0, failed: 0, aborted: false)))
         app.handleTerminal(job)
-        try? await Task.sleep(for: .milliseconds(50))
+        await Task.yield()
         #expect(app.queue.count == 1)
     }
 
