@@ -1145,3 +1145,213 @@ per-job переопределение перекрывает глобальны
 **Повторный прогон:** 138/138 в `NewTheUnarchiverTests` зелёные;
 сборка `BuildProject` — без ошибок; `XcodeListNavigatorIssues` по
 `Settings/` — пусто.
+
+## 2026-06-23 — Дыра в Этапе 6: `.needsEncoding` недостижим в продакшене
+
+При триаже багов после Этапа 7 обнаружено, что состояние
+`JobState.needsEncoding(currentEncoding:)` нигде в продакшен-коде не
+выставляется. `JobRunner.run()` его не использует (там только пароль),
+никакой UI-жест тоже не переключает задачу в это состояние.
+
+Что построено в Этапе 6 и **работает в тестах**, но **не достижимо
+пользователем**:
+- `EncodingPromptForm` (View с picker + live preview)
+- `EncodingPreviewer` (открытие архива под кандидатом-кодировкой)
+- `EncodingPromptDebounce` (200 мс throttle на смену кодировки)
+- 12 строк локализации `job.encoding.*`
+
+Причина — Newtua-движок не возвращает сигнал «имена выглядят
+подозрительно, спросите пользователя». Открытие архива всегда
+«успешно» (с автодетектом или явной кодировкой), без вопросов наверх.
+
+**Текущее последствие для пользователя:** единственный способ задать
+кодировку — глобальный `defaultEncoding` во вкладке Advanced (Этап 7).
+Если задана конкретная кодировка — движок не делает автодетект для
+всех архивов. По умолчанию (`nil` / «Определить автоматически») —
+движок выбирает сам.
+
+**Подсказка во вкладке Advanced (`settings.advanced.encoding.hint`)
+переписана честно**: «Pick a specific encoding only if you always work
+with legacy archives in the same one. It replaces the engine's
+automatic detection for every archive.»
+
+**Что НЕ делаем сейчас:**
+- Не удаляем код inline-формы — пригодится, когда триггер появится.
+- Не удаляем вкладку Advanced — это единственный способ для
+  пользователя переопределить кодировку.
+- Не дефолтим в UTF-8 — это сломало бы автодетект для легасийных
+  архивов без user-recovery path.
+
+**Открытый пункт на потом:** добавить триггер для inline-формы.
+Варианты:
+1. Кнопка/контекстное меню «Re-extract with encoding…» на терминальной
+   строке успешной распаковки — пользователь видит mojibake-имена в
+   Finder, кликает, выбирает кодировку, распаковка повторяется в новую
+   подпапку.
+2. Расширить Newtua-ABI: при подозрительном автодетекте возвращать
+   код `AmbiguousEncoding` — runner ловит его и переводит задачу в
+   `.needsEncoding`. Требует Rust-работы.
+
+Решение по триггеру — отдельный этап после v1, не блокирует релиз.
+
+## 2026-06-23 — Хотфикс: cancel из `.needsPassword`/`.needsEncoding`
+
+Ручная проверка Этапа 7 показала: при нажатии × на задаче, ждущей
+пароль (или кодировку), строка очереди не удалялась. Причина в
+`AppModel.cancel(_:)`:
+
+- Для `.queued` — `remove(job)` сразу.
+- Для `.running` — `handleTerminal` вызывался планировщиком,
+  когда runner отрабатывал.
+- Для `.needsPassword`/`.needsEncoding` — runner уже завершился ранее
+  (после первого отказа движка по паролю), его `Task` отработал и вызвал
+  `handleTerminal` один раз тогда, когда состояние было `.needsPassword`
+  (не terminal), значит ничего не запланировалось. После cancel состояние
+  становилось `.cancelled`, но второго `handleTerminal` уже не было —
+  строка висела вечно.
+
+**Фикс:** `AppModel.cancel(_:)` для non-queued случая всегда дёргает
+`handleTerminal(job)`. Идемпотентность обеспечена двумя способами:
+`remove(_:)` — `removeAll{ id == }` (no-op при повторе), плюс
+`handleTerminal` теперь проверяет `queue.contains(...)` ДО запуска
+sleep-таска — чтобы повторный вызов после уже произошедшего удаления
+не плодил лишних Task'ов.
+
+**Тесты:** 4 в `Stage7HotfixTests` (cancel из `.needsPassword`,
+`.needsEncoding`, `.running` без double-removal, `.queued` без
+регресса). Полный набор: 142/142 зелёные после фикса.
+
+## 2026-06-23 — Этап 8 завершён (Preferences → реальная распаковка)
+
+Связали настройки Этапа 7 с фактической распаковкой. То, что в Этапе 7
+было «UI + персистентность», теперь применяется в `JobRunner`/
+`Scheduler`/`AppCoordinator`.
+
+**Что появилось:**
+
+- `Engine/PostExtractActions.swift` — протокол с двумя методами
+  (`openFolder`, `moveToTrash`) и `SystemPostExtractActions` через
+  `NSWorkspace.open` / `NSWorkspace.recycle`. Инжектируется в
+  `Scheduler`, тот пробрасывает в каждый создаваемый `JobRunner`.
+- `Engine/DestinationPrompter.swift` — протокол с одним методом
+  (`promptForDestination(archive:)`) и `SystemDestinationPrompter`
+  через `NSOpenPanel`. Инжектируется в `AppCoordinator` (только для
+  `.askEachTime`-сценария).
+- `Domain/ExtractionOptions.swift` — два хелпера:
+  - `wrapperFlag: Bool` — пробрасывает в `Archive.extract(wrapper:)`.
+    `.onlyIfMultiple` → true, остальные → false.
+  - `resolvedExtractURL(base:archive:) -> URL` — для `.always`
+    возвращает `<base>/<стем-архива>/`, для остальных — `base`.
+- `Domain/ArchiveJob.swift` — поле `destinationOverride: URL?`,
+  set'ится при enqueue (`.askEachTime` пишет туда выбранную папку).
+- `Domain/AppModel.swift` — `enqueue(urls:destinationOverride:)`
+  принимает override; применяется ко всем создаваемым в этом батче
+  `ArchiveJob`. Старый вызов `enqueue(urls:)` остаётся через дефолт
+  `destinationOverride: nil`.
+- `Engine/Scheduler.swift` — `resolvedDestination(for:)` (override
+  > strategy), плюс пропуск через `PendingJob.init(job:destination:)`.
+  В `launch` создаёт `JobRunner` с `actions` от планировщика.
+- `Engine/JobRunner.swift` — использует `options.wrapperFlag` /
+  `resolvedExtractURL`, до старта `extract` создаёт wrapper-папку
+  через `FileManager.createDirectory(withIntermediateDirectories:)`.
+  После успешного `.succeeded` вызывает `actions.openFolder` /
+  `actions.moveToTrash` в зависимости от флагов.
+- `NewTheUnarchiverApp.swift` — `AppCoordinator(defaults:destinationPrompter:)`
+  принимает оба для DI. `openURLs(_:)` теперь:
+  - Префильтрует папки (`isFileURL && !hasDirectoryPath`) до любого
+    взаимодействия со стратегией.
+  - Под `.nextToArchive` / `.fixed` — один батч-`enqueue` со всем
+    массивом URL (избегаем O(N²) пересборки `active` Set).
+  - Под `.askEachTime` — цикл по URL'ам, каждому свой `NSOpenPanel`
+    через `destinationPrompter`. Пользовательский cancel пропускает
+    архив (тихо).
+
+**Зафиксированные дизайн-решения:**
+
+- **Wrapper для `.always` — на Swift-стороне, не движке.** Engine не
+  умеет «всегда оборачивать»; пишет в `<base>/<stem>/` с
+  `wrapper: false`, мы создаём папку до старта. Plus rolling-back
+  при ошибке не нужен — `createDirectory` идемпотентен, лишняя пустая
+  директория — не катастрофа.
+- **`?` default + body-resolve для сервисов** (`actions`/`prompter`/
+  `defaults`) — `@MainActor`-инициализаторы нельзя вычислять как
+  default value параметра. Парам делается опциональным, в теле init
+  резолвится `actions ?? SystemPostExtractActions()`. Этот паттерн
+  теперь применяется в `JobRunner.init`, `Scheduler.init`,
+  `AppCoordinator.init`.
+- **`destinationOverride: let` на ArchiveJob.** v1 не имеет UI чтобы
+  изменить папку после enqueue — re-drop архива единственный способ.
+  Если позже добавим UI «изменить папку», поле станет `var` с
+  setter'ом.
+- **NSOpenPanel блокирует main actor.** Это норма для
+  user-initiated prompt; runModal — синхронный по дизайну, тестам
+  его не нужно — они через `StubDestinationPrompter`.
+- **moveToTrash идёт fire-and-forget.** `NSWorkspace.recycle`
+  принимает completionHandler, мы передаём nil — ошибка (read-only
+  volume / vanished archive) не блокирует пользователя.
+
+**Тесты:** Этап 8 — 21 тест в сумме (`Stage8Tests` + `Stage8Extended`):
+helpers, destination resolution, JobRunner с реальной FFI-распаковкой
+для проверки post-actions, AppCoordinator `.askEachTime` со
+stub-prompter (включая mixed-batch и filtered directories). Полный
+набор приложения: **163/163 зелёные**.
+
+**Тестовая изоляция от `.standard` UserDefaults:** ручная проверка
+выявила, что тесты, использующие `AppCoordinator()` без аргументов,
+читали из `.standard` (поделённый с реальным приложением). Если
+пользователь успел поставить `.askEachTime` через Preferences UI,
+тест дёргал реальный `NSOpenPanel`. Фикс — `AppCoordinator.init`
+теперь принимает `defaults: UserDefaults` (default `.standard`),
+все Stage 5/8-тесты переведены на `TestSupport.isolatedDefaults()`.
+
+## 2026-06-23 — Stage 8: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента. Принято к исправлению:
+
+- **`AppCoordinator.openURLs` делал O(N²) enqueue в цикле** — для
+  `.nextToArchive` / `.fixed` каждый URL шёл отдельным `enqueue(urls:
+  [url])`, а `enqueue` строит set из активной очереди заново на каждый
+  вызов. Свёрнули в один batch-вызов per-strategy; `.askEachTime`
+  остался циклом по дизайну (один promptPerArchive).
+- **`PendingJob.init(_ job:)` convenience-init был мёртвым** — после
+  Этапа 8 нигде не использовался (планировщик везде явно передаёт
+  destination). Удалён.
+- **`handleTerminal` мог планировать лишний sleep-Task** — для
+  cancellation из `.running` сначала срабатывает `cancel(_:)`,
+  затем scheduler-Task. Оба зовут `handleTerminal`. Добавлен ранний
+  `guard queue.contains(...) else { return }` — если первый Task уже
+  удалил строку, второй не плодит лишнюю работу.
+- **`ExtractionOptions.wrapperFlag` switch с двумя `false`-ветками
+  → одна проверка `wrapperMode == .onlyIfMultiple`.** Меньше шансов
+  забыть ветку при добавлении нового кейса.
+- **`appCoordinator_dirsAreFilteredBeforePrompt` фиксировал UX-баг
+  как «acceptable»** — `.askEachTime` показывал NSOpenPanel для
+  папки, которую `enqueue` всё равно выбросит. Префильтр в
+  `openURLs` теперь отсекает директории до prompter'а. Тест
+  обновлён: теперь проверяет `prompter.asked.isEmpty`.
+
+**Отклонено:**
+
+- **Вынести `archive.deletingPathExtension().lastPathComponent`
+  в общий `archiveStem`** — преждевременно, один потребитель.
+- **`Services`-struct для DI вместо параметра** — два сервиса
+  (`actions`, `prompter`), агрегация перевешивает выгоду.
+- **Убрать `Scheduler.actions` (Scheduler только пробрасывает)** —
+  паттерн идентичен `model`/`probe` (Scheduler владеет всеми
+  сервисами job-pipeline). Симметрия сильнее SRP-микрооптимизации.
+- **`Stage8Tests` гоняют реальный FFI-extract ради post-actions
+  проверок** — это behavioral test, не unit на implementation;
+  ценность high, цена low (hello.7z — пара КБ).
+- **`responses: [URL: URL?]` (Optional-of-Optional) → enum** —
+  работает прозрачно через `?? nil`; tests не путаются.
+- **`try?` на `createDirectory` молча глотает ошибку** —
+  движок в `extract` всё равно вернёт `.io` с осмысленным
+  сообщением; pre-flight — удобство, не контракт.
+- **Stage7HotfixTests тестируют `app.handleTerminal(job)` напрямую**
+  — это явный regression-guard на «double-fire безопасен», не
+  тест реализации.
+- **Ссылка из кода на `decisions.md`** — anti-pattern по практике
+  проекта (комментарии описывают контракт, не журнал).
+
+**Повторный прогон:** 163/163 в `NewTheUnarchiverTests` зелёные;
+`BuildProject` — без ошибок.

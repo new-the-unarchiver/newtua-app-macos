@@ -8,7 +8,9 @@ struct Stage5ExtendedTests {
 
     @Test("AppCoordinator.openURLs reports true when at least one URL is new")
     func openURLs_returnsTrue_onNew() {
-        let coord = AppCoordinator()
+        let iso = TestSupport.isolatedDefaults()
+        defer { iso.teardown() }
+        let coord = AppCoordinator(defaults: iso.defaults)
         let u = URL(fileURLWithPath: "/tmp/openURLs-test-\(UUID().uuidString).zip")
         #expect(coord.openURLs([u]) == true)
         #expect(coord.model.queue.contains(where: { $0.url == u.standardizedFileURL }))
@@ -16,7 +18,9 @@ struct Stage5ExtendedTests {
 
     @Test("AppCoordinator.openURLs reports false when every URL is already in the queue")
     func openURLs_allDuplicates_returnsFalse() {
-        let coord = AppCoordinator()
+        let iso = TestSupport.isolatedDefaults()
+        defer { iso.teardown() }
+        let coord = AppCoordinator(defaults: iso.defaults)
         let u = URL(fileURLWithPath: "/tmp/openURLs-dup-\(UUID().uuidString).zip")
         _ = coord.openURLs([u])
         #expect(coord.openURLs([u]) == false)

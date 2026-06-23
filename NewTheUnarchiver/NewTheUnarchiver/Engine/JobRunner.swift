@@ -7,6 +7,10 @@ import Newtua
 @MainActor
 final class JobRunner {
     let job: ArchiveJob
+    /// User-chosen base destination — `Scheduler.resolvedDestination(for:)`.
+    /// The actual directory the engine writes into is derived via
+    /// `options.resolvedExtractURL(base:archive:)` so the `.always`
+    /// wrapper folder is created on the Swift side.
     let destination: URL
     let options: ExtractionOptions
     let password: String?
@@ -16,6 +20,7 @@ final class JobRunner {
     /// it explicitly. Affects only the `.wrongPassword` vs `.sharedDidNotMatch`
     /// distinction on auth failure.
     let passwordIsShared: Bool
+    let actions: PostExtractActions
 
     private let queue: DispatchQueue
     private let throttle: ProgressThrottle
@@ -26,7 +31,8 @@ final class JobRunner {
         options: ExtractionOptions = ExtractionOptions(),
         password: String? = nil,
         encoding: String? = nil,
-        passwordIsShared: Bool = false
+        passwordIsShared: Bool = false,
+        actions: PostExtractActions? = nil
     ) {
         self.job = job
         self.destination = destination
@@ -34,6 +40,10 @@ final class JobRunner {
         self.password = password
         self.encoding = encoding
         self.passwordIsShared = passwordIsShared
+        // Resolve here, not in the default value — `SystemPostExtractActions`'
+        // initializer is `@MainActor`, but parameter defaults evaluate in
+        // nonisolated context, which fails under strict concurrency.
+        self.actions = actions ?? SystemPostExtractActions()
         self.queue = DispatchQueue(label: "newtua.job.\(job.id.uuidString)")
         self.throttle = ProgressThrottle()
     }
@@ -52,8 +62,15 @@ final class JobRunner {
         let path = job.url.path
         let pw = password
         let enc = encoding
-        let wrapper = wrapperFlag()
-        let destPath = destination.path
+        let wrapper = options.wrapperFlag
+        let extractURL = options.resolvedExtractURL(base: destination, archive: job.url)
+        // `.always` writes into `<base>/<stem>/`; create it before handing
+        // the path to the engine so file ops don't race the directory's
+        // existence check.
+        try? FileManager.default.createDirectory(
+            at: extractURL, withIntermediateDirectories: true
+        )
+        let destPath = extractURL.path
         let token = job.cancellation
         let throttle = self.throttle
         let job = self.job
@@ -93,6 +110,7 @@ final class JobRunner {
                 job.cancel()
             } else {
                 job.updateState(.succeeded(report))
+                runPostActions(extractURL: extractURL)
             }
         } catch let err as NewtuaError {
             switch err.code {
@@ -122,10 +140,15 @@ final class JobRunner {
         }
     }
 
-    private func wrapperFlag() -> Bool {
-        switch options.wrapperMode {
-        case .never: false
-        case .onlyIfMultiple, .always: true
+    /// Fired right after `.succeeded` lands on the job. Gated by
+    /// `ExtractionOptions.openFolderAfter` / `.moveToTrashAfter`. Never
+    /// blocks the runner — actions are fire-and-forget on the main actor.
+    private func runPostActions(extractURL: URL) {
+        if options.openFolderAfter {
+            actions.openFolder(extractURL)
+        }
+        if options.moveToTrashAfter {
+            actions.moveToTrash(job.url)
         }
     }
 }

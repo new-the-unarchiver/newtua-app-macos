@@ -17,12 +17,17 @@ final class ArchiveJob: Identifiable {
     private(set) var pendingPassword: String?
     /// One-shot encoding override attached by the user via the inline prompt.
     private(set) var pendingEncoding: String?
+    /// Per-job destination chosen at enqueue time (currently set by the
+    /// `.askEachTime` flow). When non-nil it wins over the global
+    /// `destinationStrategy`. `let` because v1 has no UI to change it
+    /// after the fact — re-dropping the archive is the only way.
+    let destinationOverride: URL?
     let cancellation: CancellationToken
 
     private var entryByteOffsets: [UInt64] = []
     private var totalBytes: UInt64 = 0
 
-    init(url: URL) {
+    init(url: URL, destinationOverride: URL? = nil) {
         self.id = UUID()
         self.url = url
         self.state = .queued
@@ -30,6 +35,7 @@ final class ArchiveJob: Identifiable {
         self.overallFraction = nil
         self.pendingPassword = nil
         self.pendingEncoding = nil
+        self.destinationOverride = destinationOverride
         self.cancellation = CancellationToken()
     }
 

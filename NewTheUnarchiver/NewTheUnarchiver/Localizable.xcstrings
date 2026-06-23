@@ -1,6 +1,40 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "extract.askEachTime.message" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choose a destination folder for “%@”."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выберите папку для распаковки «%@»."
+          }
+        }
+      }
+    },
+    "extract.askEachTime.prompt" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Extract Here"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Распаковать сюда"
+          }
+        }
+      }
+    },
     "file.open.menu" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -687,13 +721,13 @@
         "en" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Used when the engine can't auto-detect the encoding. The per-archive picker still appears for archives the engine flags as ambiguous."
+            "value" : "Pick a specific encoding only if you always work with legacy archives in the same one. It replaces the engine's automatic detection for every archive. Leave on “Detect automatically” to let the engine choose per archive."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Используется, когда движок не может определить кодировку автоматически. Окно выбора кодировки в очереди всё равно появится, если движок не уверен в конкретном архиве."
+            "value" : "Выберите конкретную кодировку, только если все ваши архивы в ней. Тогда она используется вместо автоматического определения движка для каждого архива. Оставьте «Определить автоматически», чтобы движок выбирал сам."
           }
         }
       }

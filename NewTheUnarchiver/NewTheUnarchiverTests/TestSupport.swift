@@ -82,6 +82,37 @@ enum TestSupport {
     }
 }
 
+/// Records calls to `PostExtractActions` without touching Finder or the
+/// real Trash.
+@MainActor
+final class StubPostExtractActions: PostExtractActions {
+    var openedFolders: [URL] = []
+    var movedToTrash: [URL] = []
+
+    func openFolder(_ url: URL) {
+        openedFolders.append(url)
+    }
+
+    func moveToTrash(_ url: URL) {
+        movedToTrash.append(url)
+    }
+}
+
+/// Pre-programmed `DestinationPrompter` for Stage 8 tests. Returns the URL
+/// pre-set for a given archive, or `nil` to simulate the user cancelling.
+/// Records every prompt the coordinator issued so tests can assert ordering.
+@MainActor
+final class StubDestinationPrompter: DestinationPrompter {
+    /// `nil` value (set with `responses[url] = .none`) simulates cancel.
+    var responses: [URL: URL?] = [:]
+    var asked: [URL] = []
+
+    func promptForDestination(archive: URL) -> URL? {
+        asked.append(archive)
+        return responses[archive] ?? nil
+    }
+}
+
 /// In-memory `FileAssociationsService` used by Stage 7 tests. `init(initial:)`
 /// seeds the backing map; `shouldThrowOnSet` lets a test force the next
 /// `setDefaultHandler` to fail without a second stub class.

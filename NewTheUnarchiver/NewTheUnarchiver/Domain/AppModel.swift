@@ -42,7 +42,7 @@ final class AppModel {
         defaults.set(data, forKey: Self.extractionOptionsKey)
     }
 
-    func enqueue(urls: [URL]) {
+    func enqueue(urls: [URL], destinationOverride: URL? = nil) {
         var active = Set(
             queue
                 .filter { !$0.state.isTerminal }
@@ -52,7 +52,7 @@ final class AppModel {
             guard Self.isEnqueueable(url) else { continue }
             let standardized = url.standardizedFileURL
             guard !active.contains(standardized) else { continue }
-            queue.append(ArchiveJob(url: standardized))
+            queue.append(ArchiveJob(url: standardized, destinationOverride: destinationOverride))
             active.insert(standardized)
         }
     }
@@ -72,20 +72,33 @@ final class AppModel {
     }
 
     /// Cancel a job. A still-queued job is removed from the queue right
-    /// away; jobs already mid-flight (running / needsPassword / needsEncoding)
-    /// stay visible until their runner unwinds and emits the terminal state.
+    /// away. For non-queued cases we also fire `handleTerminal` because the
+    /// scheduler only fires it from inside the runner's `Task` — for jobs
+    /// parked in `.needsPassword`/`.needsEncoding` the runner has already
+    /// unwound, so without this call the `.cancelled` row would stick.
+    /// `handleTerminal` is idempotent (idle no-op when `terminalDisplayDelay`
+    /// is `nil`; doubled `remove` calls are harmless).
     func cancel(_ job: ArchiveJob) {
         let wasQueued = job.state.isQueued
         job.cancel()
         if wasQueued {
             remove(job)
+        } else {
+            handleTerminal(job)
         }
     }
 
     /// Schedule the row to drop after `terminalDisplayDelay`. Mirrors the
     /// original Unarchiver behaviour where completed rows fade away.
+    ///
+    /// Safe to call twice for the same job — the `cancel` path fires it,
+    /// and the scheduler's Task fires it again when the runner unwinds for
+    /// a `.running` cancellation. The `queue.contains` guard skips the
+    /// second background `Task` when the first one has already removed
+    /// the row.
     func handleTerminal(_ job: ArchiveJob) {
         guard let delay = terminalDisplayDelay, delay > 0 else { return }
+        guard queue.contains(where: { $0.id == job.id }) else { return }
         Task { [weak self] in
             try? await Task.sleep(for: .seconds(delay))
             guard let self else { return }

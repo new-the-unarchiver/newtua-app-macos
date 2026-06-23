@@ -39,4 +39,24 @@ struct ExtractionOptions: Sendable, Equatable, Codable {
         self.moveToTrashAfter = moveToTrashAfter
         self.defaultEncoding = defaultEncoding
     }
+
+    /// What to pass as the engine's `wrapper:` flag. Only `.onlyIfMultiple`
+    /// asks the engine to wrap — `.always` creates the wrapper on the Swift
+    /// side (`resolvedExtractURL`), `.never` extracts flat.
+    var wrapperFlag: Bool {
+        wrapperMode == .onlyIfMultiple
+    }
+
+    /// The directory the engine should actually extract into. For
+    /// `.never`/`.onlyIfMultiple` this is the user-chosen base. For
+    /// `.always` we append the archive's stem so the engine writes into
+    /// `<base>/<stem>/` with `wrapperFlag == false`.
+    func resolvedExtractURL(base: URL, archive: URL) -> URL {
+        switch wrapperMode {
+        case .never, .onlyIfMultiple:
+            return base
+        case .always:
+            return base.appendingPathComponent(archive.deletingPathExtension().lastPathComponent)
+        }
+    }
 }

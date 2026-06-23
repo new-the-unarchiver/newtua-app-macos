@@ -7,16 +7,6 @@ import Foundation
 struct PendingJob {
     let job: ArchiveJob
     let destination: URL
-
-    init(job: ArchiveJob, destination: URL) {
-        self.job = job
-        self.destination = destination
-    }
-
-    /// Convenience: use the job's default ("next to archive") destination.
-    init(_ job: ArchiveJob) {
-        self.init(job: job, destination: job.defaultDestination)
-    }
 }
 
 /// Pure compatibility check: can two jobs run in parallel?

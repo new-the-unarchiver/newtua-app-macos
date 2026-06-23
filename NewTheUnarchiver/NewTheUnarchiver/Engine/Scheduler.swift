@@ -15,6 +15,7 @@ final class Scheduler {
     let model: AppModel
     let probe: VolumeProbing
     let maxParallel: Int
+    let actions: PostExtractActions
 
     private struct ActiveSlot {
         let pending: PendingJob
@@ -30,11 +31,16 @@ final class Scheduler {
         model: AppModel,
         probe: VolumeProbing = SystemVolumeProbe(),
         maxParallel: Int? = nil,
-        cpuCount: () -> Int = { ProcessInfo.processInfo.activeProcessorCount }
+        cpuCount: () -> Int = { ProcessInfo.processInfo.activeProcessorCount },
+        actions: PostExtractActions? = nil
     ) {
         self.model = model
         self.probe = probe
         self.maxParallel = maxParallel ?? max(1, min(cpuCount(), Self.parallelCeiling))
+        // Same dance as `JobRunner.init`: resolve default in init body so
+        // the `@MainActor` `SystemPostExtractActions.init()` runs in the
+        // right context.
+        self.actions = actions ?? SystemPostExtractActions()
     }
 
     /// Try to start as many compatible queued jobs as possible. Call after
@@ -66,13 +72,27 @@ final class Scheduler {
             // `.running`, so it stays `.queued` AND lives in `active`. Without
             // skipping it here `dispatch` would re-pick it and spin forever.
             guard job.state.isQueued, active[job.id] == nil else { continue }
-            let candidate = PendingJob(job)
+            let candidate = PendingJob(job: job, destination: resolvedDestination(for: job))
             let compatible = activePairs.allSatisfy { a in
                 areCompatible(a, candidate, probe: probe)
             }
             if compatible { return candidate }
         }
         return nil
+    }
+
+    /// Per-job override (set by the `.askEachTime` drop flow) wins; otherwise
+    /// resolve through the global `destinationStrategy`. `.askEachTime`
+    /// without an override falls back to "next to archive" — should not
+    /// happen in practice because `AppCoordinator` always prompts first.
+    func resolvedDestination(for job: ArchiveJob) -> URL {
+        if let override = job.destinationOverride { return override }
+        switch model.extractionOptions.destinationStrategy {
+        case .nextToArchive, .askEachTime:
+            return job.defaultDestination
+        case .fixed(let url):
+            return url
+        }
     }
 
     /// Test hook: register a job as active without launching its runner.
@@ -130,7 +150,8 @@ final class Scheduler {
             options: model.extractionOptions,
             password: resolvedPwd,
             encoding: resolvedEncoding(for: job),
-            passwordIsShared: explicit == nil && resolvedPwd != nil
+            passwordIsShared: explicit == nil && resolvedPwd != nil,
+            actions: actions
         )
         let id = pending.job.id
         let task = Task { [weak self] in
