@@ -101,6 +101,30 @@ struct Stage4ExtendedTests {
         #expect(app.queue.first?.url == file.standardizedFileURL)
     }
 
+    @Test("AppModel.handleTerminal removes the row after the configured delay")
+    func handleTerminal_removesAfterDelay() async {
+        let app = AppModel(terminalDisplayDelay: 0.05)
+        app.enqueue(urls: [URL(fileURLWithPath: "/tmp/done.zip")])
+        let job = app.queue[0]
+        job.updateState(.running)
+        job.updateState(.succeeded(ExtractReport(extracted: 1, failed: 0, aborted: false)))
+        app.handleTerminal(job)
+        try? await Task.sleep(for: .milliseconds(200))
+        #expect(app.queue.isEmpty)
+    }
+
+    @Test("AppModel.handleTerminal is a no-op when terminalDisplayDelay is nil")
+    func handleTerminal_disabledByDefault() async {
+        let app = AppModel()
+        app.enqueue(urls: [URL(fileURLWithPath: "/tmp/x.zip")])
+        let job = app.queue[0]
+        job.updateState(.running)
+        job.updateState(.succeeded(ExtractReport(extracted: 0, failed: 0, aborted: false)))
+        app.handleTerminal(job)
+        try? await Task.sleep(for: .milliseconds(50))
+        #expect(app.queue.count == 1)
+    }
+
     @Test("AppModel.cancel drops a still-queued job and keeps a running one")
     func cancel_dropsQueued_keepsRunning() {
         let app = AppModel()

@@ -608,3 +608,47 @@ Newtua-пакет — без изменений, ранее 20/20. Сборка 
 
 **Повторный прогон:** 68/68 в `NewTheUnarchiverTests` зелёные;
 сборка `BuildProject` — чистая.
+
+## 2026-06-23 — App Sandbox выключен
+
+При ручной проверке Stage 4 (drag-and-drop `tui.zip`) задача переходила
+в `.succeeded`, но физической распаковки не было — записи блокировались
+песочницей. Entitlements автоматически выставляли
+`com.apple.security.app-sandbox = YES` + `user-selected.read-write`,
+чего недостаточно для записи рядом с архивом по dropped URL (scope даётся
+только на чтение самого файла).
+
+**Решение:** в `Signing & Capabilities` удалена capability **App Sandbox**
+(вручную через Xcode UI). Согласуется с уже принятым решением 2026-06-22
+«security-scoped bookmarks не используем»: для v1 приложение не
+sandbox-ится, distribution — вне Mac App Store.
+
+**Что осталось:** при попытке записи в защищённые директории
+(`~/Downloads/`, `~/Documents/`, `~/Desktop/`, `~/Pictures/`) macOS
+по-прежнему показывает TCC-диалог. Сейчас текст диалога — дефолтный
+системный; в Info.plist стоит добавить `NSDownloadsFolderUsageDescription`
+и соседей с осмысленной фразой типа «NewTheUnarchiver хочет распаковать
+архив в эту папку». Это пункт стадии 8 (post-extract actions/permissions),
+не блокирует Stage 4.
+
+## 2026-06-23 — Авто-удаление terminal-строк (1.2 сек)
+
+После окончания задачи строка в очереди должна тихо исчезать, как в
+оригинальном The Unarchiver. Реализовано:
+
+- `AppModel.terminalDisplayDelay: TimeInterval?` — по умолчанию `nil`,
+  то есть auto-removal выключен (Stage 1–3 тесты живут без правок,
+  assertions на `app.queue` после `waitUntilQuiescent` продолжают работать).
+- `AppCoordinator` в App-сцене явно создаёт `AppModel(terminalDisplayDelay: 1.2)`.
+- `AppModel.handleTerminal(_ job:)` — после терминального state ставит
+  `Task.sleep(for: delay)` и `remove(job)`. Удаление — fire-and-forget,
+  не блокирует `Scheduler.waitUntilQuiescent`, поэтому race с тестами
+  отсутствует.
+- `Scheduler` дёргает `model.handleTerminal(pending.job)` ровно один раз
+  после `runner.run()`.
+
+**Почему 1.2 сек:** достаточно увидеть «Готово / Ошибка / Отменено» как
+подтверждение, мало чтобы накапливать визуальный шум в очереди.
+
+**Тесты:** 2 новых в `Stage4ExtendedTests` (срабатывание с delay, no-op
+при `nil`). Полный набор: 70/70 зелёные.

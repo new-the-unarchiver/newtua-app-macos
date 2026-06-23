@@ -91,6 +91,7 @@ final class Scheduler {
         let task = Task { [weak self] in
             await runner.run()
             self?.active.removeValue(forKey: id)
+            self?.model.handleTerminal(pending.job)
             self?.dispatch()
         }
         active[id] = ActiveSlot(pending: pending, task: task)

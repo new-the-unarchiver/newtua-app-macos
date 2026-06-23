@@ -20,7 +20,7 @@ final class AppCoordinator {
     let scheduler: Scheduler
 
     init() {
-        let model = AppModel()
+        let model = AppModel(terminalDisplayDelay: 1.2)
         self.model = model
         self.scheduler = Scheduler(model: model)
     }
