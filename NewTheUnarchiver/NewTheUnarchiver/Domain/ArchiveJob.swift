@@ -33,11 +33,20 @@ final class ArchiveJob: Identifiable {
 
     func recordProgress(_ p: Newtua.Progress) {
         guard case .running = state else { return }
+        // Suppress backward ticks within one entry — the engine emits chunked
+        // writes and we don't want the progress bar to jump back.
+        if let prev = progress, prev.index == p.index, p.bytesWritten < prev.bytesWritten {
+            return
+        }
         progress = p
     }
 
-    /// Stage 2 default extraction destination: the directory containing the
-    /// archive. Stage 8 will layer the full destination strategy on top.
+    /// Filename shown to the user. One source of truth for the queue row,
+    /// password prompt header, notifications, etc.
+    var displayName: String {
+        url.lastPathComponent
+    }
+
     var defaultDestination: URL {
         url.deletingLastPathComponent()
     }

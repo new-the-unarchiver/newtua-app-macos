@@ -493,3 +493,118 @@ memberwise `init` и `Equatable` — нужны для тестирования 
   сам подтвердил после анализа).
 
 **Повторный прогон:** 49/49 в `NewTheUnarchiverTests` зелёные.
+
+## 2026-06-23 — Этап 4 завершён
+
+Главное окно очереди подключено. SwiftUI macOS 26+, без Combine, без
+SwiftData. Решено идти по «варианту (б)»: тестируем извлекаемые куски
+юнит-тестами Swift Testing, XCUI-smoke оставляем на следующий проход.
+
+**Что появилось:**
+- `Views/QueueWindow.swift` — корневой контент: список задач, drop-зона
+  (`dropDestination(for: URL.self)`), пустое состояние с подсказкой,
+  внутренний namespace `QueueWindowAccessibility` для window-ID и accessibility-id.
+- `Views/JobRowView.swift` — строка задачи: иконка формата, имя,
+  локализованный подзаголовок по виду состояния, либо детерминированный,
+  либо неопределённый `ProgressView`, кнопка ×.
+- `Views/JobRowDisplay.swift` — pure value-проекция `ArchiveJob` в поля
+  строки (title / subtitleKind / progressFraction / showsCancelButton).
+  `SubtitleKind` — enum, чтобы тесты были locale-independent.
+- `Views/FormatIcon.swift` — иконка формата по расширению с whitelist
+  через `UTType.conforms(to: .archive)` и MainActor-кэшем `[String: NSImage]`.
+  Архивные расширения конечны, эвикция не нужна.
+- `Views/QueueWindowVisibility.swift` — pure state-machine debounce-показа
+  (`hidden / shown / pendingHide(deadline)`). С тестами, но **в окно не
+  подключён** — см. следующее решение.
+- `Localizable.xcstrings` — 12 ключей в RU+EN: заголовки, подзаголовки,
+  подсказки, accessibility-метки.
+- В `Domain/ArchiveJob.swift` появилось `displayName` и monotonicity-guard
+  в `recordProgress` (не показываем «откат» прогресса внутри одной entry).
+- В `Domain/AppModel.swift` появились (1) фильтр папок прямо в
+  `enqueue(urls:)` — общий вход для drop, File ▸ Open…, double-click и
+  (2) `cancel(_: ArchiveJob)`, инкапсулирующий «отменить, и если ещё не
+  стартовала — удалить из очереди».
+- App-сцена: `WindowGroup("queue.window.title", id: ...)` с
+  `AppCoordinator` (хранит `AppModel` + `Scheduler`).
+
+**Зафиксированные дизайн-решения:**
+- **`QueueWindowVisibility` тестово готов, но не подключён к окну.** Окно
+  пока всегда видно при пустой очереди (показывается empty-state с
+  иконкой и подсказкой «Перетащите архивы сюда»). Авто-скрытие из
+  decisions.md (2026-06-22 «Видимость окна очереди») реализовано на
+  уровне state-machine, но для интеграции с SwiftUI Window/WindowGroup
+  нужен always-on координатор (MenuBarExtra или скрытая сцена) с
+  `openWindow`/`dismissWindow`. Это отдельная фасеточная задача — пока
+  откладываем, контроллер с тестами не выбрасываем, чтобы при подключении
+  на стадии 5 не переписывать.
+- **XCUI-smoke отложен.** В `xcodebuild test` test-runner на этой машине
+  не видит windows SwiftUI-приложения (window-attribute «Disabled»,
+  пустой Element subtree), даже когда приложение реально запущено и
+  отображает окно (проверено ручным `open -g`). Подозрение —
+  TCC/permissions / Liquid Glass accessibility-bridge на macOS 26.5.1.
+  Пока вместо XCUI-теста в `NewTheUnarchiverUITests.swift` лежит
+  placeholder; на стадии 5+ вернёмся к этому, возможно после
+  выдачи прав test-runner-у вручную.
+- **Дроп URL → `AppModel.enqueue` сам отбрасывает папки.** Не view-layer,
+  потому что File ▸ Open…, onOpenURLs и double-click будут читать тот же
+  массив URL и должны фильтроваться по тому же правилу.
+- **`FormatIcon` использует только `UTType.archive`-whitelist.** Раньше
+  была проверка `conforms(to: .data)`, которая истинна почти для всего;
+  заменена на `.archive`, неизвестные расширения получают fallback на
+  системную иконку архива (визуально консистентный «generic archive»).
+- **`@MainActor` на `QueueWindowVisibility`.** Несмотря на pure-state,
+  держим на main — все потребители (SwiftUI views, `Task`-задержки) уже
+  на main. Снятие изоляции дало бы микро-удобство тестам, но добавило
+  бы хрупкости в продакшен.
+
+**Тесты:** 8 TDD-минимум + 11 расширенных = 19 новых в
+`Stage4{,Extended}Tests`. Полный набор приложения: 68/68 зелёные.
+Newtua-пакет — без изменений, ранее 20/20. Сборка через
+`BuildProject` — без ошибок.
+
+## 2026-06-23 — Stage 4: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента (reuse / quality / efficiency). Принято
+к исправлению:
+
+- **`ArchiveJob.displayName`** — единая точка истины для имени файла,
+  будет переиспользована в Stage 5+ (заголовки prompt, уведомления).
+  `JobRowDisplay` теперь читает её, а не `url.lastPathComponent`.
+- **Фильтр папок перенесён в `AppModel.enqueue`** — был в
+  `QueueWindow.handleDrop`. Все будущие источники URL отбрасывают
+  каталоги одинаково.
+- **`AppModel.cancel(_:)`** — вынесена логика «отменить, и если задача
+  ещё была `.queued` — удалить из очереди». UI больше не знает про
+  состояния, просто зовёт `model.cancel(job)`.
+- **`QueueWindowAccessibility` namespace** — собрал `windowID` и
+  accessibility-IDs в одном месте, чтобы тесты и `openWindow(id:)`
+  не разъезжались.
+- **`@Bindable` снят с `QueueWindow.model`** — никаких `$model.prop`
+  биндингов не было, `@Observable` достаточно для re-render.
+- **Кэш `FormatIcon` по расширению** — `NSWorkspace.icon(for:)` бил в
+  систему на каждом ре-рендере каждой строки (24 Гц прогресс × N строк
+  → шум в системе на известный детерминированный ответ).
+  Кэш `[String: NSImage]` под MainActor, эвикция не нужна — расширения
+  конечны.
+- **`FormatIcon` whitelist `UTType.archive`** — раньше пропускал почти
+  всё через `conforms(to: .data)`.
+- **`JobRowView` ProgressView склеен** — была двойная ветка
+  determinate/indeterminate с пересекающимися условиями.
+- **Narrative-комментарии вычищены** во всех новых файлах: ссылки на
+  «Stage 2 / Stage 8», `decisions.md → Stage 4 risks`, «Stage 8 will layer
+  …» и подобные. Оставил только timeless WHY.
+
+**Отклонено:**
+- Перенос `FormatIcon` из `Views/` в `Engine/Platform/` — преждевременно,
+  пока единственный потребитель — `JobRowView`.
+- Абстракция switch в `JobRowDisplay` через таблицу — семь строк
+  читаются лучше, чем generic-обёртка.
+- Расширение `Newtua.Progress.fraction: Double?` — пока один потребитель
+  (`JobRowDisplay`), перенос в пакет ради будущих Stage 6+ опережает спрос.
+- Снять `@MainActor` с `QueueWindowVisibility` — см. дизайн-решение выше.
+- Дроп payload (`PasswordReason`, `ErrorCode`, `ExtractReport`) из
+  `SubtitleKind` — нужен Stage 6+ для prompt'ов и сообщений об ошибках,
+  тесты их уже валидируют.
+
+**Повторный прогон:** 68/68 в `NewTheUnarchiverTests` зелёные;
+сборка `BuildProject` — чистая.
