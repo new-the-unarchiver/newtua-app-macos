@@ -4,17 +4,42 @@ import Observation
 @MainActor
 @Observable
 final class AppModel {
+    /// Key under which `ExtractionOptions` is persisted as JSON.
+    static let extractionOptionsKey = "newtua.extractionOptions"
+
     private(set) var queue: [ArchiveJob] = []
     private(set) var sharedPassword: String?
-    var extractionOptions: ExtractionOptions = ExtractionOptions()
+    var extractionOptions: ExtractionOptions {
+        didSet {
+            guard extractionOptions != oldValue else { return }
+            persistExtractionOptions()
+        }
+    }
 
     /// How long a terminal row stays visible before it auto-removes. `nil`
     /// disables auto-removal — used by tests that assert queue contents
     /// after a drain.
     let terminalDisplayDelay: TimeInterval?
 
-    init(terminalDisplayDelay: TimeInterval? = nil) {
+    private let defaults: UserDefaults
+
+    init(terminalDisplayDelay: TimeInterval? = nil, defaults: UserDefaults = .standard) {
         self.terminalDisplayDelay = terminalDisplayDelay
+        self.defaults = defaults
+        self.extractionOptions = Self.loadExtractionOptions(from: defaults) ?? ExtractionOptions()
+    }
+
+    private static func loadExtractionOptions(from defaults: UserDefaults) -> ExtractionOptions? {
+        guard let data = defaults.data(forKey: extractionOptionsKey) else { return nil }
+        // Corrupt or stale schema → fall back to defaults silently; the user
+        // can re-set preferences from the UI. Crashing here would lock the
+        // user out of their own app.
+        return try? JSONDecoder().decode(ExtractionOptions.self, from: data)
+    }
+
+    private func persistExtractionOptions() {
+        guard let data = try? JSONEncoder().encode(extractionOptions) else { return }
+        defaults.set(data, forKey: Self.extractionOptionsKey)
     }
 
     func enqueue(urls: [URL]) {

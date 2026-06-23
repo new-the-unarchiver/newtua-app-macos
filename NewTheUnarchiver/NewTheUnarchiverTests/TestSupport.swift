@@ -64,4 +64,50 @@ enum TestSupport {
         job.setEntries(sizes: sizes)
         return job
     }
+
+    /// Isolated `UserDefaults` suite for tests that mutate `AppModel`'s
+    /// `extractionOptions`. Pair with the returned `teardown` closure (via
+    /// `defer`) — otherwise stale state leaks into the next test.
+    struct IsolatedDefaults {
+        let defaults: UserDefaults
+        let teardown: @Sendable () -> Void
+    }
+
+    static func isolatedDefaults() -> IsolatedDefaults {
+        let suite = "newtua-app-test-\(UUID().uuidString)"
+        let d = UserDefaults(suiteName: suite)!
+        return IsolatedDefaults(defaults: d) {
+            d.removePersistentDomain(forName: suite)
+        }
+    }
+}
+
+/// In-memory `FileAssociationsService` used by Stage 7 tests. `init(initial:)`
+/// seeds the backing map; `shouldThrowOnSet` lets a test force the next
+/// `setDefaultHandler` to fail without a second stub class.
+@MainActor
+final class StubFileAssociationsService: FileAssociationsService {
+    struct Boom: Error, Equatable {}
+
+    var shouldThrowOnSet: Bool = false
+    private var map: [String: String]
+
+    init(initial: [String: String] = [:]) {
+        self.map = initial
+    }
+
+    func defaultHandler(forUTI uti: String) -> String? {
+        map[uti]
+    }
+
+    func setDefaultHandler(_ bundleID: String, forUTI uti: String) throws {
+        if shouldThrowOnSet { throw Boom() }
+        map[uti] = bundleID
+    }
+
+    /// Mutate the backing store without going through the protocol — used by
+    /// `refresh` tests to simulate a Finder-side change.
+    func externalSet(_ uti: String, bundleID: String) {
+        map[uti] = bundleID
+    }
 }

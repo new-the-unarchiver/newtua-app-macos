@@ -107,16 +107,30 @@ final class Scheduler {
         dispatch()
     }
 
+    /// Per-job override wins; otherwise fall back to the shared password the
+    /// user set via Apply-to-All. Internal so tests can pin the rule without
+    /// invoking the full `launch` path.
+    func resolvedPassword(for job: ArchiveJob) -> String? {
+        job.pendingPassword ?? model.sharedPassword
+    }
+
+    /// Per-job override wins; otherwise fall back to the global default from
+    /// the Advanced preferences tab. `nil` means "let the engine auto-detect".
+    func resolvedEncoding(for job: ArchiveJob) -> String? {
+        job.pendingEncoding ?? model.extractionOptions.defaultEncoding
+    }
+
     private func launch(_ pending: PendingJob) {
-        let explicit = pending.job.pendingPassword
-        let resolvedPassword = explicit ?? model.sharedPassword
+        let job = pending.job
+        let explicit = job.pendingPassword
+        let resolvedPwd = resolvedPassword(for: job)
         let runner = JobRunner(
-            job: pending.job,
+            job: job,
             destination: pending.destination,
             options: model.extractionOptions,
-            password: resolvedPassword,
-            encoding: pending.job.pendingEncoding,
-            passwordIsShared: explicit == nil && resolvedPassword != nil
+            password: resolvedPwd,
+            encoding: resolvedEncoding(for: job),
+            passwordIsShared: explicit == nil && resolvedPwd != nil
         )
         let id = pending.job.id
         let task = Task { [weak self] in

@@ -995,3 +995,153 @@ ZIP-handler-е — оказался неверным.
   (sharedPassword выставляется + sharedWrongPassword → sharedDidNotMatch).
 - Computed property `hint: (Key, Color)?` вместо switch в
   `PasswordPromptForm` — стиль, не качество.
+
+## 2026-06-23 — Этап 7 завершён (Preferences: три вкладки)
+
+Окно Preferences подключено через SwiftUI-сцену `Settings { ... }` — ⌘,
+открывает его. Три вкладки в стиле оригинального The Unarchiver:
+
+**Archive Formats** — список поддерживаемых форматов с реальной
+ассоциацией через Launch Services:
+- `Settings/FileAssociationsService.swift` — протокол
+  (`defaultHandler(forUTI:)`, `setDefaultHandler(_:forUTI:)`) + реализация
+  `LaunchServicesFileAssociations` поверх
+  `LSCopyDefaultRoleHandlerForContentType` /
+  `LSSetDefaultRoleHandlerForContentType`. Без entitlements, без Sandbox.
+- `Settings/ArchiveFormatsModel.swift` — `@MainActor @Observable` модель
+  со списком строк `Row { format, currentHandler, isOurApp, handlerDisplay }`.
+  `HandlerDisplay` (иконка + локализованное имя приложения) резолвится один
+  раз во время `refresh()` и кэшируется на `Row` — иначе SwiftUI дёргал
+  бы `NSWorkspace.urlForApplication` на каждом ре-рендере.
+- `Settings/ArchiveFormatsTab.swift` — большая кнопка «использовать
+  NewTheUnarchiver для всех форматов» + список с кнопками «Назначить»
+  per row + footer-refresh. Ошибки `LSSetDefault…` показываются в
+  стандартном `Alert`, не глотаются.
+- `Engine/SupportedFormats.swift` расширен: добавлена `struct Format
+  { utiIdentifier, extensions, displayNameKey }`. `fileExtensions` и
+  `utTypes` стали `static let`, материализованными из `formats` один раз.
+
+**Extraction** — UI на `AppModel.extractionOptions`. Радиокнопки
+destination (`nextToArchive` / `fixed(URL)` / `askEachTime`), радиокнопки
+wrapper (`never` / `onlyIfMultiple` / `always`), два toggle
+(`openFolderAfter`, `moveToTrashAfter`). Для `fixed` — пикер папки через
+`NSOpenPanel`.
+
+**Advanced** — `Picker` глобальной `defaultEncoding` поверх существующего
+`SupportedEncodings.all` (тот же список, что и в inline-форме Этапа 6).
+`Scheduler.launch` теперь делает `pendingEncoding ?? defaultEncoding` —
+per-job переопределение перекрывает глобальный.
+
+**Персистентность (UserDefaults):**
+- `Domain/ExtractionOptions.swift` — `Codable`, плюс новое поле
+  `defaultEncoding: String?`.
+- `Domain/AppModel.swift` — `init(defaults: UserDefaults = .standard)`,
+  загрузка из ключа `newtua.extractionOptions` на init, `didSet`
+  на `extractionOptions` пишет JSON обратно. `Equatable`-guard в `didSet`
+  гарантирует «identity write → no-op». Битый JSON → молча fallback на
+  дефолты (не падаем).
+- Тестируем через изолированные `UserDefaults(suiteName: UUID())`
+  суиты с `defer { iso.teardown() }` — `.standard` в тестах не трогаем.
+
+**Зафиксированные дизайн-решения:**
+- **Tab 1 не лжёт пользователю.** Никаких «галочек-обманок» —
+  кнопки реально дёргают Launch Services. То, что Quick Look не показывает
+  «их я тоже умею» — пользователь видит весь список форматов с
+  актуальным состоянием.
+- **Tab 1 без UserDefaults.** Источник истины — Launch Services.
+  Преимущество: если пользователь поменял ассоциацию через Finder,
+  следующее открытие Preferences (с `onAppear { model.refresh() }`)
+  покажет актуальное состояние без рассинхронизации.
+- **`ArchiveFormatsModel` владеется `AppCoordinator`**, не view. SwiftUI
+  при переключении вкладок Settings не пересоздаёт модель, не делает
+  лишних Launch Services-сканов. View просто читает `model.rows`.
+- **`fileAssociations` сервис не светится в публичном API
+  координатора.** Он локально в `AppCoordinator.init` создаёт
+  `LaunchServicesFileAssociations()` и передаёт в `ArchiveFormatsModel`.
+  Дальше View оперирует только моделью.
+- **`destinationStrategy = .fixed(URL)` UI:** при выборе радио без
+  ранее запомненного URL подставляем `~/Downloads/`. Пикер папки
+  через `NSOpenPanel` показывает текущий URL как стартовый.
+  Security-scoped bookmarks не используем (решение 2026-06-22).
+- **`.fixed(URL)` и `askEachTime` НЕ ПРИМЕНЯЮТСЯ к фактической
+  распаковке в Этапе 7.** UI и персистентность — есть, чтение этих полей
+  `JobRunner`-ом — Этап 8 (post-actions + destination strategy
+  одновременно). Сейчас `defaultDestination` всё ещё `nextToArchive`.
+
+**Тесты:** Stage 7 — 22 теста (8 TDD-min + 10 extended для Tab 1,
+7 для Tab 2 включая Codable round-trip, defaults match original,
+персистентность через UserDefaults, fallback на корраптед JSON;
+7 для Tab 3 включая два теста `Scheduler.resolvedEncoding` /
+`resolvedPassword`). Полный набор: **138/138 зелёные**.
+
+## 2026-06-23 — Stage 7: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента. Принято к исправлению:
+
+- **`HandlerDisplay.resolve` дёргал `NSWorkspace.urlForApplication` /
+  `NSWorkspace.icon` / `FileManager.displayName` из `body` каждого
+  `ArchiveFormatRow`** — для 7 форматов = до 21 syscall на ре-рендер.
+  Резолвится теперь один раз в `ArchiveFormatsModel.refresh()` и
+  кэшируется в `Row.handlerDisplay: HandlerDisplay?`. Row потерял
+  `Equatable` (NSImage не Equatable; тесты сравнивают поля).
+- **`SupportedFormats.fileExtensions` и `utTypes` были computed
+  properties** — `flatMap`/`compactMap` на каждом обращении, включая
+  hot-path `fileImporter`. Вернули `static let`.
+- **`ArchiveFormatsModel` владелась view через `@State` в `init`** —
+  при каждом переключении вкладок Settings создавалась новая инстанция
+  с фоновым `refresh()`. Поднята в `AppCoordinator`, ArchiveFormatsTab
+  принимает её как `let` параметр. `onAppear { model.refresh() }`
+  обеспечивает свежесть при возврате на вкладку.
+- **`fileAssociations` пробрасывался через три уровня** (`App` →
+  `SettingsScene` → `ArchiveFormatsTab`). Свернулось вместе с пунктом
+  выше: координатор создаёт `LaunchServicesFileAssociations()` локально,
+  владеет `ArchiveFormatsModel`. Сервис как stored property снят.
+- **`try? model.setAsDefaultForAll()` молча глотал ошибку Launch
+  Services.** Теперь оборачивается в `runWithErrorAlert { try ... }`
+  и показывается через `.alert(item:)`. Пользователь видит, когда
+  ассоциация не применилась.
+- **`StubFileAssociationsService` в `Stage7Tests.swift` + `ThrowingStub`
+  в `Stage7ExtendedTests.swift`** были двумя похожими стабами. Слиты
+  в один — `StubFileAssociationsService` в `TestSupport.swift` с
+  опциональным `shouldThrowOnSet` флажком.
+- **`TestSupport.removeIsolatedDefaults` через KVC ключ
+  `"NSUserDefaultsSuiteName"`** — KVC-доступ к этому полю не работает
+  на современной macOS, dead branch. Refactor:
+  `TestSupport.isolatedDefaults()` возвращает
+  `IsolatedDefaults { defaults, teardown }`-структуру, `teardown`
+  — closure, знающий suite name.
+- **`Picker("", selection: ...)` создавал пустой ключ `""` в
+  `Localizable.xcstrings`** при автосканировании Xcode. Заменено на
+  `Picker(selection: ...) { ... } label: { EmptyView() }`. Пустая
+  запись удалена из каталога.
+- **`.tag(enc.label as String?)` redundant cast** — `SupportedEncoding.label`
+  и так `String?`. Снят.
+- **`currentFixedURL()` хелпер в `ExtractionTab`** дублировал
+  `if case .fixed(let url) = ...` ещё в двух местах. Inline'нут;
+  пикер папки и binding читают strategy напрямую.
+- **Stage-narrative-комментарии** в `ExtractionTab`, `AdvancedTab`,
+  `ArchiveFormatsModel`, `AppModel.extractionOptionsKey`,
+  `ExtractionOptions` — упоминания «UI-only — Stage 8 wires…»,
+  «decisions.md, 2026-06-23 Stage 1», «v1 hosts only…» удалены.
+  Доки описывают контракт, не таймлайн.
+
+**Отклонено:**
+- **`destinationKindBinding` свести в computed-extension
+  на `DestinationStrategy`** — потребовало бы пробрасывать
+  `defaultFolder()` (FileManager) в модель. Текущая форма изолирует
+  view-логику в view-слое.
+- **`didSet` на `extractionOptions` пишет в UserDefaults на каждый
+  set** — `Equatable`-guard уже отсекает identity writes. Будущий
+  TextField внутри struct сейчас не планируется.
+- **`HStack { Button; Spacer() }` для left-align** — две строки,
+  читается так же, как `.frame(maxWidth: .infinity, alignment: .leading)`.
+- **`Scheduler.resolvedPassword/Encoding` internal для тестов —
+  «leaky visibility»** — паттерн уже установлен Stage 3
+  (`pickCompatibleQueuedJob`). Симметрия сильнее микро-инкапсуляции.
+- **`HandlerDisplay` в отдельном файле** — он остался в
+  `ArchiveFormatsModel.swift`, потому что используется только моделью
+  и тесно с ней связан. Отдельный файл — overkill для 15 строк.
+
+**Повторный прогон:** 138/138 в `NewTheUnarchiverTests` зелёные;
+сборка `BuildProject` — без ошибок; `XcodeListNavigatorIssues` по
+`Settings/` — пусто.

@@ -12,18 +12,27 @@ enum FormatIcon {
 
     @MainActor
     static func image(for url: URL) -> Image {
-        Image(nsImage: nsImage(for: url))
+        let ext = url.pathExtension.lowercased()
+        guard let utType = UTType(filenameExtension: ext), utType.conforms(to: .archive) else {
+            return Image(nsImage: fallback)
+        }
+        return Image(nsImage: cachedIcon(for: utType, key: ext))
     }
 
     @MainActor
-    private static func nsImage(for url: URL) -> NSImage {
-        let ext = url.pathExtension.lowercased()
-        guard let utType = UTType(filenameExtension: ext), utType.conforms(to: .archive) else {
-            return fallback
+    static func image(forUTI identifier: String) -> Image {
+        guard let utType = UTType(identifier), utType.conforms(to: .archive) else {
+            return Image(nsImage: fallback)
         }
-        if let hit = archiveCache[ext] { return hit }
+        let key = utType.preferredFilenameExtension ?? utType.identifier
+        return Image(nsImage: cachedIcon(for: utType, key: key))
+    }
+
+    @MainActor
+    private static func cachedIcon(for utType: UTType, key: String) -> NSImage {
+        if let hit = archiveCache[key] { return hit }
         let icon = NSWorkspace.shared.icon(for: utType)
-        archiveCache[ext] = icon
+        archiveCache[key] = icon
         return icon
     }
 }

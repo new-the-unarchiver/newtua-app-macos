@@ -36,6 +36,13 @@ struct NewTheUnarchiverApp: App {
                 .keyboardShortcut("o", modifiers: .command)
             }
         }
+
+        Settings {
+            SettingsScene(
+                model: coordinator.model,
+                archiveFormatsModel: coordinator.archiveFormatsModel
+            )
+        }
     }
 }
 
@@ -47,11 +54,16 @@ struct NewTheUnarchiverApp: App {
 final class AppCoordinator {
     let model: AppModel
     let scheduler: Scheduler
+    let archiveFormatsModel: ArchiveFormatsModel
 
     init() {
         let model = AppModel(terminalDisplayDelay: 1.2)
         self.model = model
         self.scheduler = Scheduler(model: model)
+        self.archiveFormatsModel = ArchiveFormatsModel(
+            service: LaunchServicesFileAssociations(),
+            ourBundleID: Bundle.main.bundleIdentifier ?? ""
+        )
     }
 
     /// Add URLs to the queue and kick the scheduler. Returns whether
