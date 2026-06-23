@@ -51,15 +51,13 @@ final class ArchiveJob: Identifiable {
         updateState(.queued)
     }
 
-    /// Attach a one-shot encoding override and requeue. Symmetric with
-    /// `requeue(withPassword:)`.
     func requeue(withEncoding encoding: String?) {
         attachPendingEncoding(encoding)
         updateState(.queued)
     }
 
     func updateState(_ next: JobState) {
-        guard state.canTransition(to: next) else { return }
+        guard state != next, state.canTransition(to: next) else { return }
         state = next
     }
 
