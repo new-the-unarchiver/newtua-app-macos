@@ -855,3 +855,73 @@ Inline-блоки запроса пароля и выбора кодировки
 
 **Повторный прогон:** 94/94 в `NewTheUnarchiverTests` зелёные;
 сборка `BuildProject` — чистая.
+
+## 2026-06-23 — Stage 6 hotfix: контракт `Encrypted`/`WrongPassword` в движке
+
+Ручная проверка Stage 6 на свежесозданных `secret-{1,2,3}.zip` (ZipCrypto,
+`zip -P pw …`) выявила, что приложение не показывает запрос пароля и
+«успешно» создаёт пустые файлы. Изначальный диагноз — баг в Swift или
+ZIP-handler-е — оказался неверным.
+
+**Реальная причина:** общая orchestration `extract_all` в `newtua-core`
+проглатывала per-entry-ошибки шифрования в `ExtractReport.failed` и
+возвращала `Ok` для **всех форматов** (ZIP, content-encrypted 7z, RAR).
+7z с header-encryption (`-mhe=on`) бросал `.Encrypted` ещё на `open()` —
+это поведение и было моим (неверным) reference-контрактом.
+
+**Что починили в движке** (коммиты `ec60059..e312c8b` на ветке `macapp`,
+сделано Rust-агентом):
+- Новый метод `ArchiveReader::verify_password(&mut self)` (дефолт — `Ok`,
+  реализации в ZIP/7z/RAR; no-op для tar/ar/cab/gzip).
+- `extract_all` вызывает `verify_password()` **один раз** до создания
+  файлов. Без пароля или с неверным — `Err(Encrypted/WrongPassword)` на
+  верхнем уровне, **ничего не пишется на диск**.
+- ABI `NtuaStatus` не менялся, `newtua.h` не менялся. C-обёртка и
+  `bindings/swift/Sources/Newtua/` без правок.
+
+**Что это даёт GUI без единой Swift-правки:**
+- `JobRunner` уже корректно ловит `.encrypted`/`.wrongPassword` в
+  `catch let err as NewtuaError` (это было сделано ещё в Stage 2).
+  Раньше ветка срабатывала только на header-encrypted 7z; теперь
+  срабатывает и на ZipCrypto-ZIP, и на content-encrypted 7z, и на RAR.
+
+**Контракт, на который мы теперь опираемся:**
+- `ntua_open(path)` **без пароля** на ZipCrypto-ZIP / content-encrypted
+  7z — **успешно**. `list`/`entries` работают, `Entry.isEncrypted` — флаг.
+  Это намеренно — позволяет показать содержимое **до** запроса пароля.
+- `ntua_open(path)` на header-encrypted 7z / RAR — `Encrypted` /
+  `WrongPassword` (нельзя даже залистить без пароля).
+- `ntua_extract(...)` без правильного пароля по любому encrypted-архиву
+  — `Encrypted` или `WrongPassword` на верхнем уровне. Ничего на диск.
+- `Ok` с `report.failed > 0` теперь означает **только** реальные
+  per-entry проблемы (zip-slip, отказ на write и т.п.), **не** auth.
+
+**Чего больше НЕ делаем (специально, чтобы не было соблазна):**
+- **Не добавляем pre-check `entries.any(\.isEncrypted)` в Swift.**
+  Это нарушение Prime Directive (§0 брифа): архивная логика — в движке.
+- **Не парсим `report.failed` как сигнал «нужен пароль».** После фикса
+  это не работает: auth-ошибки приходят как `Err`, а не как
+  `Ok + failed`.
+- **Не gate-им `list` на пароле.** Listing без пароля — feature.
+
+**Известные ограничения движка** (для GUI-тестов и фикстур):
+- **Content-encrypted 7z + WRONG password** в `sevenz-rust2` ненадёжен —
+  может вернуть мусорные байты вместо ошибки. **Для GUI-фикстур
+  использовать только `-mhe=on` (header-encrypted).** Существующая
+  `secret.7z` в `crates/newtua-core/tests/fixtures/` — header-encrypted,
+  это правильно.
+- **ZipCrypto wrong password** имеет ~1/256 false-accept (известное
+  свойство формата; The Unarchiver такой же). Для надёжного теста
+  «wrong password» брать AES-encrypted ZIP или header-encrypted 7z.
+
+**Проверка:**
+- CLI на `secret-{1,2,3}.zip`: без пароля → «архив зашифрован», ничего
+  не пишется; с неверным → «неверный пароль», ничего не пишется; с
+  правильным → распаковывается. `list` без пароля — работает.
+- 94/94 в `NewTheUnarchiverTests` зелёные после пересборки lib.
+- Ручная проверка GUI на тех же файлах — теперь должна показывать
+  inline-форму пароля.
+
+**Handoff-документ** от Rust-агента —
+`docs/handoff-2026-06-23-encrypted-extract.md`. Источник правды по
+контракту.

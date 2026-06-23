@@ -180,4 +180,59 @@ struct Stage6ExtendedTests {
         d.recordResolved("a", at: t0)
         #expect(d.submit("b", at: t0.addingTimeInterval(1.0)) == .runNow)
     }
+
+    // MARK: - Engine contract regression: encrypted ZIP / RAR / content-7z
+
+    /// Pins the engine's uniform Encrypted/WrongPassword contract — see
+    /// `docs/handoff-2026-06-23-encrypted-extract.md`. If a future engine
+    /// change reverts to the "Ok with failed > 0" shape, these go red.
+    @Test("Runner reports needsPassword(.encrypted) on a ZipCrypto archive without a password")
+    func runner_zipCrypto_noPassword_setsEncrypted() async throws {
+        let app = AppModel()
+        app.enqueue(urls: [TestSupport.fixture("secret.zip")])
+        let job = try #require(app.queue.first)
+        let dest = try TestSupport.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dest) }
+
+        let runner = JobRunner(job: job, destination: dest)
+        await runner.run()
+
+        #expect(job.state == .needsPassword(.encrypted))
+        // Nothing should be written on auth failure.
+        let written = (try? FileManager.default.contentsOfDirectory(atPath: dest.path)) ?? []
+        #expect(written.isEmpty)
+    }
+
+    @Test("Runner reports needsPassword(.wrongPassword) on a ZipCrypto archive with a wrong password")
+    func runner_zipCrypto_wrongPassword_setsWrongPassword() async throws {
+        let app = AppModel()
+        app.enqueue(urls: [TestSupport.fixture("secret.zip")])
+        let job = try #require(app.queue.first)
+        let dest = try TestSupport.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dest) }
+
+        let runner = JobRunner(job: job, destination: dest, password: "definitely-wrong")
+        await runner.run()
+
+        #expect(job.state == .needsPassword(.wrongPassword))
+    }
+
+    @Test("Runner succeeds on a ZipCrypto archive with the correct password")
+    func runner_zipCrypto_correctPassword_succeeds() async throws {
+        let app = AppModel()
+        app.enqueue(urls: [TestSupport.fixture("secret.zip")])
+        let job = try #require(app.queue.first)
+        let dest = try TestSupport.makeTempDir()
+        defer { try? FileManager.default.removeItem(at: dest) }
+
+        let runner = JobRunner(job: job, destination: dest, password: "pw")
+        await runner.run()
+
+        guard case .succeeded(let report) = job.state else {
+            Issue.record("Expected .succeeded, got \(job.state)")
+            return
+        }
+        #expect(report.extracted >= 1)
+        #expect(report.failed == 0)
+    }
 }
