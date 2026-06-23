@@ -13,7 +13,6 @@ struct Stage4ExtendedTests {
     func visibility_emptyWhileHidden_staysHidden() {
         let v = QueueWindowVisibility(hideDelay: 0.3)
         let t0 = Date(timeIntervalSince1970: 0)
-        // Several empty observations before any job — must stay hidden, no pending tick.
         let deadline1 = v.observe(isEmpty: true, at: t0)
         let deadline2 = v.observe(isEmpty: true, at: t0.addingTimeInterval(1))
         #expect(deadline1 == nil)
@@ -47,13 +46,10 @@ struct Stage4ExtendedTests {
     func display_running_unknownSize_noFraction() {
         let job = ArchiveJob(url: URL(fileURLWithPath: "/tmp/x.zip"))
         job.updateState(.running)
-        job.recordProgress(TestSupport.tick(bytes: 100, of: 0))
+        job.recordProgress(TestSupport.tick(bytes: 100, of: 0, path: "a"))
         let d = JobRowDisplay(job: job)
         #expect(d.progressFraction == nil)
-        // Still shows the running variant — the indeterminate spinner.
-        if case .running = d.subtitleKind { /* ok */ } else {
-            Issue.record("Expected .running subtitle, got \(d.subtitleKind)")
-        }
+        #expect(d.subtitleKind == .running(currentPath: "a"))
     }
 
     @Test("JobRowDisplay carries the password-prompt reason from the job state")

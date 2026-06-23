@@ -38,7 +38,6 @@ struct QueueWindow: View {
         }
     }
 
-    @ViewBuilder
     private var emptyState: some View {
         VStack(spacing: 12) {
             Image(systemName: "tray.and.arrow.down")
@@ -57,7 +56,6 @@ struct QueueWindow: View {
         .padding(.vertical, 32)
     }
 
-    @ViewBuilder
     private var queueList: some View {
         List {
             ForEach(model.queue) { job in
@@ -69,8 +67,10 @@ struct QueueWindow: View {
     }
 
     private func handleDrop(_ urls: [URL]) -> Bool {
+        let before = model.queue.count
         model.enqueue(urls: urls)
-        scheduler.dispatch()
-        return true
+        let accepted = model.queue.count > before
+        if accepted { scheduler.dispatch() }
+        return accepted
     }
 }

@@ -33,10 +33,12 @@ final class ArchiveJob: Identifiable {
 
     func recordProgress(_ p: Newtua.Progress) {
         guard case .running = state else { return }
-        // Suppress backward ticks within one entry — the engine emits chunked
-        // writes and we don't want the progress bar to jump back.
-        if let prev = progress, prev.index == p.index, p.bytesWritten < prev.bytesWritten {
-            return
+        if let prev = progress {
+            // Backward ticks within one entry would jerk the bar leftwards.
+            if prev.index == p.index, p.bytesWritten < prev.bytesWritten { return }
+            // Identical ticks would notify @Observable for nothing — the
+            // engine emits several per second per active job, so dedup early.
+            if prev == p { return }
         }
         progress = p
     }

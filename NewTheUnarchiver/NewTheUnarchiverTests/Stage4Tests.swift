@@ -25,12 +25,8 @@ struct Stage4Tests {
         let deadline = v.observe(isEmpty: true, at: t0)
         #expect(v.shouldShow)
         #expect(deadline == t0.addingTimeInterval(0.3))
-
-        // Before deadline → still shown.
         v.tick(at: t0.addingTimeInterval(0.1))
         #expect(v.shouldShow)
-
-        // At/after deadline → hidden.
         v.tick(at: t0.addingTimeInterval(0.3))
         #expect(!v.shouldShow)
     }
@@ -42,7 +38,6 @@ struct Stage4Tests {
         v.observe(isEmpty: false, at: t0)
         v.observe(isEmpty: true, at: t0)
         v.observe(isEmpty: false, at: t0.addingTimeInterval(0.05))
-        // Even if a stale tick fires past the original deadline, we stay shown.
         v.tick(at: t0.addingTimeInterval(0.5))
         #expect(v.shouldShow)
     }

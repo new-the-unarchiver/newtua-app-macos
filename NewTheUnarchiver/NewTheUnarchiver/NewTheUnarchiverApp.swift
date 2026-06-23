@@ -15,7 +15,6 @@ struct NewTheUnarchiverApp: App {
 /// Owns the long-lived domain + engine state. Held by `@State` on the App so
 /// it survives scene re-evaluation.
 @MainActor
-@Observable
 final class AppCoordinator {
     let model: AppModel
     let scheduler: Scheduler

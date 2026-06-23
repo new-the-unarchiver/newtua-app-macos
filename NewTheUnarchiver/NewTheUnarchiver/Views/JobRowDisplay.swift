@@ -23,36 +23,32 @@ struct JobRowDisplay: Equatable {
     @MainActor
     init(job: ArchiveJob) {
         self.title = job.displayName
+        var fraction: Double? = nil
         switch job.state {
         case .queued:
             self.subtitleKind = .queued
-            self.progressFraction = nil
             self.showsCancelButton = true
         case .running:
             self.subtitleKind = .running(currentPath: job.progress?.path)
-            self.progressFraction = Self.fraction(from: job.progress)
+            fraction = Self.fraction(from: job.progress)
             self.showsCancelButton = true
         case .needsPassword(let reason):
             self.subtitleKind = .needsPassword(reason)
-            self.progressFraction = nil
             self.showsCancelButton = true
         case .needsEncoding:
             self.subtitleKind = .needsEncoding
-            self.progressFraction = nil
             self.showsCancelButton = true
         case .succeeded(let report):
             self.subtitleKind = .succeeded(report)
-            self.progressFraction = nil
             self.showsCancelButton = false
         case .failed(let code):
             self.subtitleKind = .failed(code)
-            self.progressFraction = nil
             self.showsCancelButton = false
         case .cancelled:
             self.subtitleKind = .cancelled
-            self.progressFraction = nil
             self.showsCancelButton = false
         }
+        self.progressFraction = fraction
     }
 
     private static func fraction(from progress: Newtua.Progress?) -> Double? {
