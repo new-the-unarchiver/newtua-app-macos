@@ -13,11 +13,19 @@ struct PasswordPromptForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            if reason == .wrongPassword {
+            switch reason {
+            case .encrypted:
+                EmptyView()
+            case .wrongPassword:
                 Text("job.password.wrong.hint",
-                     comment: "Inline hint shown when the previous password attempt was wrong")
+                     comment: "Inline hint shown after the user typed a wrong password")
                     .font(.caption)
                     .foregroundStyle(.red)
+            case .sharedDidNotMatch:
+                Text("job.password.sharedDidNotMatch.hint",
+                     comment: "Neutral hint shown when the remembered Apply-to-All password didn't match this archive")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
             HStack(spacing: 8) {
                 SecureField(

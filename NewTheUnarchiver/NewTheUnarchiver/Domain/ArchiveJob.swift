@@ -34,11 +34,28 @@ final class ArchiveJob: Identifiable {
     }
 
     func attachPendingPassword(_ password: String?) {
+        guard pendingPassword != password else { return }
         pendingPassword = password
     }
 
     func attachPendingEncoding(_ encoding: String?) {
+        guard pendingEncoding != encoding else { return }
         pendingEncoding = encoding
+    }
+
+    /// Attach a one-shot password and move the job back to `.queued` so the
+    /// scheduler picks it up. Single invariant point — used both by the
+    /// directly-submitted job and by Apply-to-All fan-out.
+    func requeue(withPassword password: String?) {
+        attachPendingPassword(password)
+        updateState(.queued)
+    }
+
+    /// Attach a one-shot encoding override and requeue. Symmetric with
+    /// `requeue(withPassword:)`.
+    func requeue(withEncoding encoding: String?) {
+        attachPendingEncoding(encoding)
+        updateState(.queued)
     }
 
     func updateState(_ next: JobState) {

@@ -3,7 +3,14 @@ import Newtua
 
 enum PasswordReason: Sendable, Equatable {
     case encrypted
+    /// User typed a password and the engine said it was wrong. Show a
+    /// direct "Wrong password — try again" hint.
     case wrongPassword
+    /// The runner silently tried `AppModel.sharedPassword` and the engine
+    /// said it was wrong. The user never typed for this archive — show
+    /// a neutral "Saved password didn't match" hint instead of the red
+    /// retry message.
+    case sharedDidNotMatch
 }
 
 enum JobState: Sendable, Equatable {

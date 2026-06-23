@@ -11,6 +11,11 @@ final class JobRunner {
     let options: ExtractionOptions
     let password: String?
     let encoding: String?
+    /// `true` when `password` came from `AppModel.sharedPassword` (the runner
+    /// silently retried with a remembered value), `false` when the user typed
+    /// it explicitly. Affects only the `.wrongPassword` vs `.sharedDidNotMatch`
+    /// distinction on auth failure.
+    let passwordIsShared: Bool
 
     private let queue: DispatchQueue
     private let throttle: ProgressThrottle
@@ -20,13 +25,15 @@ final class JobRunner {
         destination: URL,
         options: ExtractionOptions = ExtractionOptions(),
         password: String? = nil,
-        encoding: String? = nil
+        encoding: String? = nil,
+        passwordIsShared: Bool = false
     ) {
         self.job = job
         self.destination = destination
         self.options = options
         self.password = password
         self.encoding = encoding
+        self.passwordIsShared = passwordIsShared
         self.queue = DispatchQueue(label: "newtua.job.\(job.id.uuidString)")
         self.throttle = ProgressThrottle()
     }
@@ -92,7 +99,7 @@ final class JobRunner {
             case .encrypted:
                 job.updateState(.needsPassword(.encrypted))
             case .wrongPassword:
-                job.updateState(.needsPassword(.wrongPassword))
+                job.updateState(.needsPassword(passwordIsShared ? .sharedDidNotMatch : .wrongPassword))
             default:
                 job.updateState(.failed(err.code))
             }

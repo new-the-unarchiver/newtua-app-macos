@@ -925,3 +925,73 @@ ZIP-handler-е — оказался неверным.
 **Handoff-документ** от Rust-агента —
 `docs/handoff-2026-06-23-encrypted-extract.md`. Источник правды по
 контракту.
+
+## 2026-06-23 — Stage 6 UX-фикс: Apply-to-All fan-out и shared-vs-explicit
+
+Ручная проверка с тремя ZipCrypto-архивами обнажила два UX-бага после
+того, как engine-контракт заработал:
+
+1. **Apply-to-All не догонял параллельно ждущие.** Два архива стартанули
+   одновременно и оба провалились в `.needsPassword(.encrypted)`.
+   Пользователь ввёл пароль с «Для всех» в первой строке — `sharedPassword`
+   проставился, первая задача распакована, **но вторая** так и сидела
+   ждать ручного ввода. Спец говорит «применяется к следующим в очереди» —
+   так и должно быть, но «следующие» включает и тех, кто **сейчас**
+   ждёт пароля, не только будущие.
+2. **Третий архив сразу пишет «Пароль не подошёл», хотя не вводился.**
+   После Apply-to-All движок тихо пробовал `sharedPassword` на новом
+   архиве, получал `WrongPassword`, и UI показывал красный хинт
+   «Пароль не подошёл — попробуйте ещё раз». Пользователь не понимал
+   откуда «не подошёл», если он ничего не вводил.
+
+**Что починили:**
+- **`Scheduler.submitPassword(applyToAll: true)`** теперь после установки
+  `sharedPassword` проходит по `model.queue` и для каждой задачи в
+  `state.isAwaitingPassword` (любой `PasswordReason`) вызывает
+  `requeue(withPassword:)`. Это «фан-аут»: один Apply-to-All зачинает все
+  параллельно ждущие задачи с тем же паролем.
+- **Новый кейс `PasswordReason.sharedDidNotMatch`** разделяет два
+  сценария:
+  - `.wrongPassword` — пользователь сам ввёл пароль, тот не подошёл.
+    Красный хинт «Пароль не подошёл — попробуйте ещё раз».
+  - `.sharedDidNotMatch` — runner молча попробовал запомненный
+    `sharedPassword`, тот не подошёл. Нейтральный хинт «Запомненный
+    пароль не подошёл к этому архиву, введите его пароль».
+- **`JobRunner.passwordIsShared: Bool`** — новый init-параметр. Scheduler
+  в `launch` выставляет `passwordIsShared = explicit == nil &&
+  resolvedPassword != nil`. На `WrongPassword` от движка runner выбирает
+  reason по этому флагу.
+- **`ArchiveJob.requeue(withPassword:)`/`requeue(withEncoding:)`** —
+  единый паттерн «attach pending + перевести в .queued», вынесенный из
+  Scheduler (был дубль в submitPassword/submitEncoding × двух местах).
+- **`attachPendingPassword/Encoding`** теперь idempotent — guard на
+  равенство значения, как в `recordProgress`. Двойной Apply-to-All с
+  тем же паролем не шлёт лишних `@Observable`-уведомлений.
+
+**Зафиксированные дизайн-решения:**
+- **`passwordIsShared` живёт на `JobRunner`, не на `Scheduler`.** Ревью
+  предлагал переписывать state из Scheduler после Task-завершения, но
+  это нарушает инкапсуляцию (runner отвечает за state как сейчас,
+  scheduler — за orchestration). Флаг — это факт о входе runner-а
+  («мы тебя запустили с тихим shared»), а не UX-концепция.
+- **`""`-pendingPassword не отсекается на типовом уровне.** UI блокирует
+  `disabled(password.isEmpty)`, до runner-а пустой пароль не дойдёт.
+  Защита от impossible state — over-engineering.
+- **Snapshot `model.queue` перед итерацией не нужен.** MainActor +
+  `@Observable` уведомления не синхронны во время фрейма — гонок не будет.
+- **«Перезапись sharedPassword новым Apply-to-All — намеренно.»**
+  Пользователь явно сказал «теперь этот пароль для всего» — старый
+  забывается, поведение совпадает с оригиналом The Unarchiver.
+
+**Тесты:** 9 в `Stage6HotfixTests` (3 TDD-минимум + 6 extended). Полный
+набор `NewTheUnarchiverTests`: **106/106 зелёные** после ревью-фиксов.
+
+**Ревью-находки отклонены:**
+- Защита от orphan-job (`precondition(model.queue.contains(job))`) —
+  по архитектуре не может случиться (`submitPassword` зовётся из
+  `JobRowView`, который держит job из `model.queue`).
+- Доп. тест на «running при Apply-to-All → sharedDidNotMatch через
+  естественный flow» — уже покрыт сочетанием двух существующих тестов
+  (sharedPassword выставляется + sharedWrongPassword → sharedDidNotMatch).
+- Computed property `hint: (Key, Color)?` вместо switch в
+  `PasswordPromptForm` — стиль, не качество.

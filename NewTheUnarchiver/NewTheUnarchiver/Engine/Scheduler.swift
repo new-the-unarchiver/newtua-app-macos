@@ -84,15 +84,18 @@ final class Scheduler {
     }
 
     /// User entered a password in the inline prompt. With Apply-to-All the
-    /// value is remembered on `AppModel` for future encrypted archives;
-    /// otherwise it lives only on this job. Either way the job is requeued
-    /// and the scheduler is kicked.
+    /// value is remembered on `AppModel` for future encrypted archives AND
+    /// fanned out to every other job currently awaiting a password — so
+    /// archives that raced into `.needsPassword` in parallel don't ask
+    /// independently. Without Apply-to-All the value lives on this job only.
     func submitPassword(_ password: String, applyToAll: Bool, for job: ArchiveJob) {
         if applyToAll {
             model.setSharedPassword(password, applyToAll: true)
+            for other in model.queue where other.id != job.id && other.state.isAwaitingPassword {
+                other.requeue(withPassword: password)
+            }
         }
-        job.attachPendingPassword(password)
-        job.updateState(.queued)
+        job.requeue(withPassword: password)
         dispatch()
     }
 
@@ -100,18 +103,20 @@ final class Scheduler {
     /// job only — encoding is per-archive (not a shared Apply-to-All), and
     /// the runner reads it on next launch.
     func submitEncoding(_ encoding: String?, for job: ArchiveJob) {
-        job.attachPendingEncoding(encoding)
-        job.updateState(.queued)
+        job.requeue(withEncoding: encoding)
         dispatch()
     }
 
     private func launch(_ pending: PendingJob) {
+        let explicit = pending.job.pendingPassword
+        let resolvedPassword = explicit ?? model.sharedPassword
         let runner = JobRunner(
             job: pending.job,
             destination: pending.destination,
             options: model.extractionOptions,
-            password: pending.job.pendingPassword ?? model.sharedPassword,
-            encoding: pending.job.pendingEncoding
+            password: resolvedPassword,
+            encoding: pending.job.pendingEncoding,
+            passwordIsShared: explicit == nil && resolvedPassword != nil
         )
         let id = pending.job.id
         let task = Task { [weak self] in

@@ -324,6 +324,23 @@
         }
       }
     },
+    "job.password.sharedDidNotMatch.hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "The saved password didn't match this archive. Enter the one it uses."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Запомненный пароль не подошёл к этому архиву. Введите его пароль."
+          }
+        }
+      }
+    },
     "job.password.wrong.hint" : {
       "extractionState" : "manual",
       "localizations" : {
