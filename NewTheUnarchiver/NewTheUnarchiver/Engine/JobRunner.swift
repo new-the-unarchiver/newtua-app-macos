@@ -62,15 +62,6 @@ final class JobRunner {
         let path = job.url.path
         let pw = password
         let enc = encoding
-        let wrapper = options.wrapperFlag
-        let extractURL = options.resolvedExtractURL(base: destination, archive: job.url)
-        // `.always` writes into `<base>/<stem>/`; create it before handing
-        // the path to the engine so file ops don't race the directory's
-        // existence check.
-        try? FileManager.default.createDirectory(
-            at: extractURL, withIntermediateDirectories: true
-        )
-        let destPath = extractURL.path
         let token = job.cancellation
         let throttle = self.throttle
         let job = self.job
@@ -79,14 +70,38 @@ final class JobRunner {
             let archive = try await onQueue {
                 try Archive(path: path, password: pw, encoding: enc)
             }
-            let entrySizes: [UInt64] = try await onQueue {
-                archive.entries().map(\.size)
+            let entries = try await onQueue { archive.entries() }
+            let topLevelCount = Self.topLevelItemCount(in: entries.map(\.path))
+            job.setEntries(sizes: entries.map(\.size))
+
+            let extractURL = options.resolvedExtractURL(
+                base: destination,
+                archive: self.job.url,
+                topLevelCount: topLevelCount
+            )
+            // Pre-create the wrapper dir (engine gets `wrapper: false` and
+            // doesn't create it itself). `extractRan` lets us roll back an
+            // empty wrapper if extract throws — otherwise the
+            // verify_password contract "nothing on disk after auth failure"
+            // leaks an empty `<dest>/<stem>/`. Using a success flag (not a
+            // post-hoc directory scan) avoids a false negative when Finder
+            // has already dropped `.DS_Store` inside an existing dest.
+            let preExisted = FileManager.default.fileExists(atPath: extractURL.path)
+            try? FileManager.default.createDirectory(
+                at: extractURL, withIntermediateDirectories: true
+            )
+            var extractRan = false
+            defer {
+                if !preExisted, !extractRan {
+                    try? FileManager.default.removeItem(at: extractURL)
+                }
             }
-            job.setEntries(sizes: entrySizes)
+            let destPath = extractURL.path
+
             let report = try await onQueue {
                 let r = try archive.extract(
                     to: destPath,
-                    wrapper: wrapper,
+                    wrapper: false,
                     cancellation: token,
                     progress: { p in
                         // Called on `queue`. Throttle here, drop ticks issued
@@ -105,6 +120,7 @@ final class JobRunner {
                 }
                 return r
             }
+            extractRan = true
 
             if report.aborted {
                 job.cancel()
@@ -150,5 +166,22 @@ final class JobRunner {
         if options.moveToTrashAfter {
             actions.moveToTrash(job.url)
         }
+    }
+
+    /// Counts unique top-level path components — matches the original
+    /// Unarchiver's "more than one top-level item" criterion. A single
+    /// file like `a.txt`, a single dir like `foo/...`, and an explicit
+    /// `foo/` + `foo/a.txt` pair all return `1`. Two siblings (file or
+    /// dir) at the root return `2`. Path separator is `/` (engine
+    /// guarantee), case-sensitive (matches APFS default).
+    nonisolated static func topLevelItemCount(in paths: [String]) -> Int {
+        var seen = Set<String>()
+        for path in paths {
+            guard let first = path.split(
+                separator: "/", maxSplits: 1, omittingEmptySubsequences: true
+            ).first else { continue }
+            seen.insert(String(first))
+        }
+        return seen.count
     }
 }

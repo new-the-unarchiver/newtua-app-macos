@@ -1355,3 +1355,88 @@ stub-prompter (включая mixed-batch и filtered directories). Полный
 
 **Повторный прогон:** 163/163 в `NewTheUnarchiverTests` зелёные;
 `BuildProject` — без ошибок.
+
+## 2026-06-23 — Хотфикс Этапа 8: `.onlyIfMultiple` и single-file архивы
+
+Ручная проверка показала: для архива из одного файла настройка
+**«Только если внутри несколько объектов»** всё равно создавала папку
+по имени архива. `.never` и `.always` работали.
+
+**Причина — расхождение семантик.** Стадии 7–8 мапили
+`.onlyIfMultiple` на `wrapper: true` в движке. Но:
+
+- **Движок** (`wrapper: true`): «есть общий корень-папка → не оборачивать;
+  иначе обернуть в `<стем>/`».
+- **The Unarchiver** (`.onlyIfMultiple`): «один объект верхнего уровня
+  (файл или папка) → не оборачивать; два и более → оборачивать».
+
+Совпадают почти везде, **расходятся для архива с одним файлом в корне**:
+у движка общего корня-папки нет → оборачивает; у оригинала один объект →
+не оборачивает.
+
+**Что починили:**
+
+- `ExtractionOptions.wrapperFlag` удалён. Движку всегда передаётся
+  `wrapper: false`.
+- `ExtractionOptions.shouldWrap(topLevelCount:) -> Bool` —
+  имплементирует оригинальную семантику: `.onlyIfMultiple` оборачивает
+  при `topLevelCount > 1`, `.always` всегда, `.never` никогда.
+- `ExtractionOptions.resolvedExtractURL(base:archive:topLevelCount:) -> URL`
+  — единственный источник правды для целевой папки: если `shouldWrap`,
+  возвращает `<base>/<стем-архива>/`, иначе `base`.
+- `JobRunner.topLevelItemCount(in: [String]) -> Int` (`nonisolated static`)
+  — считает уникальные первые компоненты путей. Распознаёт
+  `foo/` + `foo/a.txt` как один корень. Сепаратор `/` — гарантия движка.
+- `JobRunner.run()` теперь зовёт `archive.entries()` один раз, считает
+  `topLevelCount`, передаёт его в `resolvedExtractURL`, всегда даёт
+  движку `wrapper: false`.
+
+**Rollback пустой обёртки на auth-failure:**
+- Пре-создание директории (`FileManager.createDirectory`) нужно,
+  потому что движок при `wrapper: false` не создаёт сам `destPath`.
+- Но при `auth-failure` движок не пишет ничего (verify_password,
+  Stage 6 hotfix), и мы рискуем оставить пустую `<dest>/<стем>/`.
+- Через `var extractRan = false` + `defer { if !preExisted && !extractRan
+  { removeItem(at: extractURL) } }`. Флаг ставится после возврата из
+  `try await onQueue { ... extract ... }` (включая случай `aborted=true`
+  — частично распакованную папку оставляем как было).
+- **Почему success-флаг, а не `contentsOfDirectory.isEmpty`:**
+  Finder/Spotlight может уронить `.DS_Store` в существующий dest до
+  старта — пост-фактум-проверка пустоты ловит false-negative и оставляет
+  обёртку зависшей.
+
+**Контракт пересборки:**
+- Хотфикс ломает один Stage 2-тест и два Stage 6-теста, которые
+  кодировали **старое неправильное** поведение (single-file → wrapper).
+  Они обновлены под правильный контракт. Это не регресс — тесты
+  документировали баг.
+
+**Тесты:** Stage8Hotfix — 10 (6 на `topLevelItemCount`, 3 на
+`shouldWrap`, 1 интеграционный на `hello.7z` под `.onlyIfMultiple`,
+проверяет flat-распаковку без обёртки). Полный набор: **174/174 зелёные**.
+
+## 2026-06-23 — Stage 8 hotfix: фаза ревью (упрощённая, одним проходом)
+
+Один simplify-агент — change небольшой, три параллельных были бы
+overkill. Принято к исправлению:
+
+- **Локальные алиасы `archiveURL`/`baseDestination`/`options`** в
+  `JobRunner.run()` лишние — `job.url`/`destination`/`self.options`
+  читаются нормально на месте. Дроп локалов.
+- **`defer` на пустоту через `contentsOfDirectory.isEmpty` хрупкий** —
+  если Finder уронил `.DS_Store` в существующий dest перед стартом,
+  обёртка-сирота останется. Заменено на success-флаг `extractRan`.
+- **Cross-reference в doc** `// see JobRunner.topLevelItemCount(in:)`
+  убран — doc rot waiting to happen, инвариант сформулирован прямо.
+
+**Отклонено:**
+
+- **`topLevelItemCount(in: some Sequence<Entry>)`** — текущий вариант
+  с `[String]` тестируется литералами без `import Newtua`. Generic
+  усложнит сигнатуру ради сэкономленных миллисекунд.
+- **`TestSupport.expectSucceeded(_ job:)` хелпер** — паттерн
+  `if case .succeeded = job.state` встречается в 3–4 местах, но имя
+  для хелпера громоздкое; экономия 2 строки на тест. Defer до 5+
+  использований.
+
+**Повторный прогон:** 174/174 в `NewTheUnarchiverTests` зелёные.

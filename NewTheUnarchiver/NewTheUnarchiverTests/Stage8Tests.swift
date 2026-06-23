@@ -9,28 +9,37 @@ struct Stage8Tests {
 
     // MARK: - ExtractionOptions helpers
 
-    @Test("wrapperFlag: .never and .always are false; .onlyIfMultiple is true")
-    func wrapperFlag_perMode() {
+    @Test("resolvedExtractURL: .always appends the archive stem regardless of top-level count")
+    func resolvedExtractURL_always_appendsStem() {
         var opts = ExtractionOptions()
-        opts.wrapperMode = .never
-        #expect(opts.wrapperFlag == false)
-        opts.wrapperMode = .onlyIfMultiple
-        #expect(opts.wrapperFlag == true)
         opts.wrapperMode = .always
-        #expect(opts.wrapperFlag == false)
-    }
-
-    @Test("resolvedExtractURL: .always appends the archive stem; others unchanged")
-    func resolvedExtractURL_perMode() {
-        var opts = ExtractionOptions()
         let base = URL(fileURLWithPath: "/tmp/out")
         let archive = URL(fileURLWithPath: "/Users/u/Downloads/photos.zip")
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 1)
+                .lastPathComponent == "photos")
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 7)
+                .lastPathComponent == "photos")
+    }
+
+    @Test("resolvedExtractURL: .never keeps base regardless of top-level count")
+    func resolvedExtractURL_never_keepsBase() {
+        var opts = ExtractionOptions()
         opts.wrapperMode = .never
-        #expect(opts.resolvedExtractURL(base: base, archive: archive) == base)
+        let base = URL(fileURLWithPath: "/tmp/out")
+        let archive = URL(fileURLWithPath: "/Users/u/Downloads/photos.zip")
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 1) == base)
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 5) == base)
+    }
+
+    @Test("resolvedExtractURL: .onlyIfMultiple wraps when more than one top-level item")
+    func resolvedExtractURL_onlyIfMultiple_wrapsWhenMultiple() {
+        var opts = ExtractionOptions()
         opts.wrapperMode = .onlyIfMultiple
-        #expect(opts.resolvedExtractURL(base: base, archive: archive) == base)
-        opts.wrapperMode = .always
-        #expect(opts.resolvedExtractURL(base: base, archive: archive).lastPathComponent == "photos")
+        let base = URL(fileURLWithPath: "/tmp/out")
+        let archive = URL(fileURLWithPath: "/Users/u/Downloads/photos.zip")
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 1) == base)
+        #expect(opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 2)
+                .lastPathComponent == "photos")
     }
 
     // MARK: - ArchiveJob destinationOverride

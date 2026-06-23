@@ -523,7 +523,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Запомненный пароль не подошёл к этому архиву. Введите его пароль."
+            "value" : "Ранее указанный пароль не подошёл. Введите пароль от архива."
           }
         }
       }
@@ -727,7 +727,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Выберите конкретную кодировку, только если все ваши архивы в ней. Тогда она используется вместо автоматического определения движка для каждого архива. Оставьте «Определить автоматически», чтобы движок выбирал сам."
+            "value" : "Укажите кодировку, только если все ваши архивы в ней. Тогда она используется вместо автоопределения для каждого архива. Оставьте «Определить автоматически», чтобы движок выбирал сам."
           }
         }
       }
@@ -970,6 +970,23 @@
         }
       }
     },
+    "settings.formats.allSet" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "All formats already open with NewTheUnarchiver"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Все форматы уже открываются в NewTheUnarchiver"
+          }
+        }
+      }
+    },
     "settings.formats.error.dismiss" : {
       "extractionState" : "manual",
       "localizations" : {
@@ -1000,23 +1017,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Не удалось изменить приложение по умолчанию"
-          }
-        }
-      }
-    },
-    "settings.formats.allSet" : {
-      "extractionState" : "manual",
-      "localizations" : {
-        "en" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "All formats already open with NewTheUnarchiver"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Все форматы уже открываются в NewTheUnarchiver"
           }
         }
       }
@@ -1067,7 +1067,7 @@
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Использовать NewTheUnarchiver для всех поддерживаемых форматов"
+            "value" : "Открывать в NewTheUnarchiver все доступные форматы"
           }
         }
       }

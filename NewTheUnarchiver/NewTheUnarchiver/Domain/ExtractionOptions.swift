@@ -40,23 +40,25 @@ struct ExtractionOptions: Sendable, Equatable, Codable {
         self.defaultEncoding = defaultEncoding
     }
 
-    /// What to pass as the engine's `wrapper:` flag. Only `.onlyIfMultiple`
-    /// asks the engine to wrap — `.always` creates the wrapper on the Swift
-    /// side (`resolvedExtractURL`), `.never` extracts flat.
-    var wrapperFlag: Bool {
-        wrapperMode == .onlyIfMultiple
+    /// Whether a wrapper folder should be created on the Swift side, given
+    /// the runtime entry layout. Implements the original Unarchiver
+    /// semantics (`.onlyIfMultiple` = more than one top-level item) rather
+    /// than the engine's common-root semantics, which diverge for
+    /// single-file archives.
+    func shouldWrap(topLevelCount: Int) -> Bool {
+        switch wrapperMode {
+        case .never: false
+        case .always: true
+        case .onlyIfMultiple: topLevelCount > 1
+        }
     }
 
-    /// The directory the engine should actually extract into. For
-    /// `.never`/`.onlyIfMultiple` this is the user-chosen base. For
-    /// `.always` we append the archive's stem so the engine writes into
-    /// `<base>/<stem>/` with `wrapperFlag == false`.
-    func resolvedExtractURL(base: URL, archive: URL) -> URL {
-        switch wrapperMode {
-        case .never, .onlyIfMultiple:
-            return base
-        case .always:
-            return base.appendingPathComponent(archive.deletingPathExtension().lastPathComponent)
-        }
+    /// The directory the engine should actually extract into. Always
+    /// resolves on the Swift side — engine receives `wrapper: false` —
+    /// so the wrap decision exactly matches `shouldWrap`.
+    func resolvedExtractURL(base: URL, archive: URL, topLevelCount: Int) -> URL {
+        shouldWrap(topLevelCount: topLevelCount)
+            ? base.appendingPathComponent(archive.deletingPathExtension().lastPathComponent)
+            : base
     }
 }

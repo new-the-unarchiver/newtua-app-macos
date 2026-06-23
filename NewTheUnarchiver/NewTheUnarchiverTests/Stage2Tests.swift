@@ -26,9 +26,9 @@ struct Stage2Tests {
         #expect(report.extracted == 1)
         #expect(report.failed == 0)
         #expect(report.aborted == false)
-        // hello.7z has a single entry → engine creates a wrapper folder
-        // named after the archive (hello/) under default wrapper=true.
-        let written = dest.appendingPathComponent("hello/a.txt")
+        // hello.7z has a single top-level entry → `.onlyIfMultiple`
+        // (default) leaves it flat at `<dest>/a.txt`.
+        let written = dest.appendingPathComponent("a.txt")
         #expect(FileManager.default.fileExists(atPath: written.path))
     }
 

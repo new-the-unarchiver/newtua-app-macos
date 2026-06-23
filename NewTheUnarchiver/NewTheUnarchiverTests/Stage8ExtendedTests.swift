@@ -15,7 +15,7 @@ struct Stage8ExtendedTests {
         opts.wrapperMode = .always
         let base = URL(fileURLWithPath: "/tmp/out")
         let archive = URL(fileURLWithPath: "/tmp/archive_no_ext")
-        let resolved = opts.resolvedExtractURL(base: base, archive: archive)
+        let resolved = opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 1)
         #expect(resolved.lastPathComponent == "archive_no_ext")
     }
 
@@ -25,10 +25,9 @@ struct Stage8ExtendedTests {
         opts.wrapperMode = .always
         let base = URL(fileURLWithPath: "/tmp/out")
         let archive = URL(fileURLWithPath: "/tmp/foo.tar.gz")
-        // `deletingPathExtension()` strips just `.gz` — matches what the
-        // engine's own wrapper logic would do, and what the user expects
-        // (single-folder name, double-extension preserved inside).
-        let resolved = opts.resolvedExtractURL(base: base, archive: archive)
+        // `deletingPathExtension()` strips just `.gz` — single-folder name,
+        // double-extension preserved inside.
+        let resolved = opts.resolvedExtractURL(base: base, archive: archive, topLevelCount: 1)
         #expect(resolved.lastPathComponent == "foo.tar")
     }
 
