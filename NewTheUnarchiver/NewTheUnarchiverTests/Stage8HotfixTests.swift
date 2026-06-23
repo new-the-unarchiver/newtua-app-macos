@@ -40,6 +40,45 @@ struct Stage8HotfixTests {
         #expect(JobRunner.topLevelItemCount(in: []) == 0)
     }
 
+    // MARK: - macOS sidecar entries are skipped (mirrors engine behaviour)
+
+    @Test("topLevelItemCount: __MACOSX/ sidecar at root is skipped")
+    func tlic_macosx_skipped() {
+        #expect(JobRunner.topLevelItemCount(in: ["__MACOSX/._foo", "foo.txt"]) == 1)
+    }
+
+    @Test("topLevelItemCount: .DS_Store at root is skipped")
+    func tlic_dsStore_skipped() {
+        #expect(JobRunner.topLevelItemCount(in: [".DS_Store", "foo.txt"]) == 1)
+    }
+
+    @Test("topLevelItemCount: ._foo AppleDouble at root is skipped")
+    func tlic_dotUnderscore_skipped() {
+        #expect(JobRunner.topLevelItemCount(in: ["._foo", "foo.txt"]) == 1)
+    }
+
+    @Test("topLevelItemCount: archive containing only sidecars → 0")
+    func tlic_sidecarOnly_isZero() {
+        #expect(JobRunner.topLevelItemCount(
+            in: ["__MACOSX/._foo", ".DS_Store", "._bar"]
+        ) == 0)
+    }
+
+    @Test("topLevelItemCount: deep sidecars under a real root don't change the count")
+    func tlic_deepSidecarsDontDoubleCount() {
+        #expect(JobRunner.topLevelItemCount(in: ["foo/bar", "foo/._bar"]) == 1)
+    }
+
+    @Test("topLevelItemCount: real-world `hello.txt.zip` (file + __MACOSX sidecar) → 1")
+    func tlic_helloTxtZip_realPaths() {
+        // Exact entries list `7zz l hello.txt.zip` reports for an archive
+        // a user zipped via Finder around a single file. Must count as
+        // one top-level item so `.onlyIfMultiple` extracts flat.
+        #expect(JobRunner.topLevelItemCount(
+            in: ["hello.txt", "__MACOSX/._hello.txt"]
+        ) == 1)
+    }
+
     // MARK: - shouldWrap
 
     @Test("shouldWrap: .never is false regardless of top-level count")
