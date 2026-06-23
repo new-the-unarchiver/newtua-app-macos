@@ -3,7 +3,8 @@ import Newtua
 
 struct JobRowView: View {
     let job: ArchiveJob
-    let onCancel: () -> Void
+    let model: AppModel
+    let scheduler: Scheduler
 
     var body: some View {
         let display = JobRowDisplay(job: job)
@@ -12,7 +13,7 @@ struct JobRowView: View {
                 .resizable()
                 .interpolation(.high)
                 .frame(width: 32, height: 32)
-            VStack(alignment: .leading, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
                 Text(display.title)
                     .font(.body)
                     .lineLimit(1)
@@ -23,17 +24,13 @@ struct JobRowView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .truncationMode(.middle)
-                if case .running = display.subtitleKind {
-                    if let fraction = display.progressFraction {
-                        ProgressView(value: fraction).progressViewStyle(.linear)
-                    } else {
-                        ProgressView().progressViewStyle(.linear)
-                    }
-                }
+                accessory(for: display)
             }
             Spacer(minLength: 8)
             if display.showsCancelButton {
-                Button(action: onCancel) {
+                Button {
+                    model.cancel(job)
+                } label: {
                     Image(systemName: "xmark.circle.fill")
                         .imageScale(.large)
                 }
@@ -43,6 +40,28 @@ struct JobRowView: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
+    private func accessory(for display: JobRowDisplay) -> some View {
+        switch display.subtitleKind {
+        case .running:
+            if let fraction = display.progressFraction {
+                ProgressView(value: fraction).progressViewStyle(.linear)
+            } else {
+                ProgressView().progressViewStyle(.linear)
+            }
+        case .needsPassword(let reason):
+            PasswordPromptForm(reason: reason) { password, applyToAll in
+                scheduler.submitPassword(password, applyToAll: applyToAll, for: job)
+            }
+        case .needsEncoding:
+            EncodingPromptForm(job: job) { encoding in
+                scheduler.submitEncoding(encoding, for: job)
+            }
+        case .queued, .succeeded, .failed, .cancelled:
+            EmptyView()
+        }
     }
 
     @ViewBuilder

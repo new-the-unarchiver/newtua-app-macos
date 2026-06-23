@@ -10,6 +10,7 @@ final class JobRunner {
     let destination: URL
     let options: ExtractionOptions
     let password: String?
+    let encoding: String?
 
     private let queue: DispatchQueue
     private let throttle: ProgressThrottle
@@ -18,12 +19,14 @@ final class JobRunner {
         job: ArchiveJob,
         destination: URL,
         options: ExtractionOptions = ExtractionOptions(),
-        password: String? = nil
+        password: String? = nil,
+        encoding: String? = nil
     ) {
         self.job = job
         self.destination = destination
         self.options = options
         self.password = password
+        self.encoding = encoding
         self.queue = DispatchQueue(label: "newtua.job.\(job.id.uuidString)")
         self.throttle = ProgressThrottle()
     }
@@ -41,6 +44,7 @@ final class JobRunner {
 
         let path = job.url.path
         let pw = password
+        let enc = encoding
         let wrapper = wrapperFlag()
         let destPath = destination.path
         let token = job.cancellation
@@ -49,7 +53,7 @@ final class JobRunner {
 
         do {
             let archive = try await onQueue {
-                try Archive(path: path, password: pw)
+                try Archive(path: path, password: pw, encoding: enc)
             }
             let entrySizes: [UInt64] = try await onQueue {
                 archive.entries().map(\.size)

@@ -83,12 +83,35 @@ final class Scheduler {
         active[job.id] = ActiveSlot(pending: pending, task: Task {})
     }
 
+    /// User entered a password in the inline prompt. With Apply-to-All the
+    /// value is remembered on `AppModel` for future encrypted archives;
+    /// otherwise it lives only on this job. Either way the job is requeued
+    /// and the scheduler is kicked.
+    func submitPassword(_ password: String, applyToAll: Bool, for job: ArchiveJob) {
+        if applyToAll {
+            model.setSharedPassword(password, applyToAll: true)
+        }
+        job.attachPendingPassword(password)
+        job.updateState(.queued)
+        dispatch()
+    }
+
+    /// User picked an encoding in the inline prompt. The value lives on the
+    /// job only — encoding is per-archive (not a shared Apply-to-All), and
+    /// the runner reads it on next launch.
+    func submitEncoding(_ encoding: String?, for job: ArchiveJob) {
+        job.attachPendingEncoding(encoding)
+        job.updateState(.queued)
+        dispatch()
+    }
+
     private func launch(_ pending: PendingJob) {
         let runner = JobRunner(
             job: pending.job,
             destination: pending.destination,
             options: model.extractionOptions,
-            password: model.sharedPassword
+            password: pending.job.pendingPassword ?? model.sharedPassword,
+            encoding: pending.job.pendingEncoding
         )
         let id = pending.job.id
         let task = Task { [weak self] in

@@ -731,3 +731,127 @@ dest неявно отсекал «себя с собой». Фикс — явн
 
 Эти флаги работают без правок `.xcscheme` / создания `.xctestplan` —
 xcodebuild уважает их напрямую.
+
+## 2026-06-23 — Этап 6 завершён
+
+Inline-блоки запроса пароля и выбора кодировки в строке очереди.
+
+**Что появилось:**
+- `Domain/ArchiveJob.swift` — поля `pendingPassword: String?` и
+  `pendingEncoding: String?` плюс `attachPendingPassword/Encoding(_:)`.
+  Одноразовые «карманы» для значений, введённых пользователем в inline-форме;
+  `JobRunner` подхватывает их на следующем запуске и фолбэчит на
+  `AppModel.sharedPassword`.
+- `Engine/Scheduler.swift` — `submitPassword(_:applyToAll:for:)` и
+  `submitEncoding(_:for:)`. Кладут значение, переводят задачу обратно
+  в `.queued`, дёргают `dispatch()`.
+- `Engine/JobRunner.swift` — конструктор принимает `encoding: String?`,
+  пробрасывает в `Archive(path:, password:, encoding:)`.
+- `Engine/EncodingPromptDebounce.swift` — чистая state-machine 200 мс
+  для предпросмотра кодировки. По паттерну совпадает с
+  `QueueWindowVisibility` (Stage 4).
+- `Engine/EncodingPreviewer.swift` — единственная точка открытия архива
+  ради preview первого ненулевого пути. Обходит `entry(at:)` без
+  материализации полного `[Entry]`. View не импортирует `Newtua`.
+- `Engine/SupportedEncodings.swift` — статический список кодировок:
+  auto / UTF-8 / Cyrillic (cp1251, cp866) / Western / Central European /
+  Shift JIS / EUC-JP / GBK / Big5 / EUC-KR. Лейблы — WHATWG-идентификаторы
+  для `encoding_rs`, имена строк — ключи в Catalog.
+- `Views/PasswordPromptForm.swift` — `SecureField` + чекбокс «Apply to All» +
+  `Continue`. На `.wrongPassword` — красная подсказка над полем.
+- `Views/EncodingPromptForm.swift` — `Picker` с `String?`-тэгами +
+  живой `Result: <первое имя>` под ним. Кнопка `Continue` отдаёт выбор
+  в `scheduler.submitEncoding`.
+- `Views/JobRowView.swift` — `switch` по `subtitleKind` для accessory
+  (вместо трёх `if case`); параметры переехали на прямые
+  `model: AppModel` + `scheduler: Scheduler` (по Stage 4-паттерну, без
+  closure-проброса). Pass-through-методы из `AppCoordinator` удалены.
+- `Localizable.xcstrings` — 18 новых ключей (RU+EN) для всех новых
+  лейблов / кнопок / плейсхолдеров / подсказок.
+
+**Зафиксированные дизайн-решения:**
+- **`String?` через Optional-тэги Picker, без sentinel.** Первая
+  версия использовала `id = label ?? ""`, что повторяло ошибку
+  Stage 0 (stringly-typed `kind: String`). Заменено на `Picker(selection:
+  $selected as String?)` с `.tag(enc.label)`, где `enc.label: String?`.
+  Auto-detect — это `nil`, а не пустая строка.
+- **Открытие `Archive` ради preview — только в `Engine/EncodingPreviewer`,
+  не в View.** View не импортирует `Newtua`. Соблюдает §0 брифа
+  (`apps/macos/CLAUDE.md`): «никакой логики архивов в Swift-слое».
+- **`Scheduler` передаётся в View напрямую, как `AppModel`.** Stage 4
+  установил паттерн «view знает model и зовёт `model.cancel(job)`»;
+  здесь продолжаем — view знает scheduler и зовёт
+  `scheduler.submitPassword/submitEncoding`. Closure-проброс на 4 уровня
+  (`App` → `QueueWindow` → `JobRowView` → форма) свернули в один —
+  closure остался только у самой формы (на `Continue`).
+- **`pendingPassword/pendingEncoding` отдельно от `JobState`.** Альтернатива
+  (зашить payload в `.queued(pending: …)`) была отклонена: текущая форма
+  читается лучше, разделение «состояние UI» и «hand-off slot для runner»
+  явное. Если будет третий вид pending — пересмотрим.
+- **`Onappear` запускает preview сразу.** Это не дубль работы движка:
+  пользователь попал в `.needsEncoding` именно потому, что авто-детект
+  не подошёл (или подошёл частично). Преview с auto-detect снова —
+  чтобы показать в форме, как именно сейчас декодируются имена.
+- **`pickerStyle(.menu)` вместо segmented/radial.** Список из 12 кодировок
+  — для popup menu естественный размер; стилизация Liquid Glass на
+  `.menu` рендерится сама.
+- **`Apply to All` не пишет на диск.** `AppModel.sharedPassword` живёт
+  только в памяти и сбрасывается на выходе из приложения. Соответствует
+  решению 2026-06-22 «Пароль и кодировка».
+
+**Тесты:** 4 TDD-минимум (`Stage6Tests`) + 13 расширенных
+(`Stage6ExtendedTests`). Полный набор приложения: 94/94 зелёные. Сборка
+через `BuildProject` — чисто.
+
+## 2026-06-23 — Stage 6: фаза ревью (шаги 7–10)
+
+Три параллельных ревью-агента (reuse / quality / efficiency). Принято
+к исправлению:
+
+- **`""` как sentinel для nil-кодировки.** Stringly-typed повтор ошибки
+  Stage 0. Заменено на `Picker(selection: $selected as String?)` с
+  Optional-тэгами; `SupportedEncoding` больше не `Identifiable` —
+  `ForEach` через `id: \.label`.
+- **Открытие `Archive` из View.** `EncodingPromptForm.fetchPreview`
+  вызывал `Archive(path:, encoding:)` в самом view, нарушая §0 брифа.
+  Логика переехала в `Engine/EncodingPreviewer` — единственный потребитель
+  `import Newtua` среди новых файлов Stage 6.
+- **Полный `entries()` ради первого имени.** Заменено на обход
+  `archive.entry(at: i)` в цикле — для архива на 50 тыс. файлов это
+  десятки тысяч аллокаций пути впустую. Цикл также проверяет
+  `Task.isCancelled` между шагами.
+- **Отсутствие `Task.isCancelled` перед `Archive(path:)`** в детачнутой
+  задаче. Добавлены проверки до и после открытия — чтобы быстрая
+  смена пяти кодировок не оставляла 4 завершённых open в фоне.
+- **Closure-проброс на 4 уровня.** `App → coordinator.submitPassword →
+  QueueWindow.onSubmitPassword → JobRowView.onSubmitPassword → форма`.
+  Свернули: `Scheduler` передаётся в `QueueWindow` и `JobRowView`
+  напрямую (по аналогии с `model`); формы остались с одним closure
+  на `Continue`. `AppCoordinator.submitPassword/submitEncoding` удалены
+  как мёртвые pass-through.
+- **3 `if case` в `JobRowView.body` → один `switch`.** Accessory-секция
+  (progress / password form / encoding form) теперь читается единым
+  паттерн-матчингом на `subtitleKind`.
+- **Narrative-комментарий «keep that in sync»** в `EncodingPromptForm`
+  исчез — sentinel заменён типом, инвариант кодируется в `String?`,
+  а не в комментарии.
+- **`defaultValue: "Password"` в `SecureField`** — лишний параметр
+  (Catalog всё равно перекрывает). Удалён для консистентности.
+
+**Отклонено:**
+- **`@State` mutating struct (`EncodingPromptDebounce`)** — агент сам
+  написал «not a bug, designed-for». SwiftUI хранит `@State` в reference-
+  backed storage, mutating-метод через keypath работает.
+- **`pendingPassword/pendingEncoding` ↔ `JobState` payload** —
+  архитектурная альтернатива (зашить в `.queued`), агент пометил
+  «обсудить, не баг». Для v1 текущая форма чище.
+- **`PromptRow<Control>` shared abstraction** для двух форм —
+  агент сам пишет «factor when third appears».
+- **Onappear-fix (skip первый preview)** — UX-решение: пользователь
+  попал в форму потому, что автодетект не сработал, и первое имя
+  с автодетектом — ровно та информация, которую он хочет видеть.
+- **`JobRunner.entries().map(\.size)`** — нерегресс, помечено как
+  debt-note (для очень больших архивов).
+
+**Повторный прогон:** 94/94 в `NewTheUnarchiverTests` зелёные;
+сборка `BuildProject` — чистая.

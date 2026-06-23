@@ -7,7 +7,11 @@ struct NewTheUnarchiverApp: App {
 
     var body: some Scene {
         Window("queue.window.title", id: QueueWindowAccessibility.windowID) {
-            QueueWindow(model: coordinator.model, onOpen: coordinator.openURLs)
+            QueueWindow(
+                model: coordinator.model,
+                scheduler: coordinator.scheduler,
+                onOpen: coordinator.openURLs
+            )
                 .onOpenURL { url in
                     coordinator.openURLs([url])
                 }
@@ -42,7 +46,7 @@ struct NewTheUnarchiverApp: App {
 @MainActor
 final class AppCoordinator {
     let model: AppModel
-    private let scheduler: Scheduler
+    let scheduler: Scheduler
 
     init() {
         let model = AppModel(terminalDisplayDelay: 1.2)

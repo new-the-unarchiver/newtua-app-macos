@@ -12,6 +12,11 @@ final class ArchiveJob: Identifiable {
     /// Aggregate progress across the whole archive, 0…1. `nil` while total
     /// size is unknown — the row falls back to the indeterminate spinner.
     private(set) var overallFraction: Double?
+    /// One-shot password attached by the user via the inline prompt. The
+    /// runner reads it on next launch and falls back to `AppModel.sharedPassword`.
+    private(set) var pendingPassword: String?
+    /// One-shot encoding override attached by the user via the inline prompt.
+    private(set) var pendingEncoding: String?
     let cancellation: CancellationToken
 
     private var entryByteOffsets: [UInt64] = []
@@ -23,7 +28,17 @@ final class ArchiveJob: Identifiable {
         self.state = .queued
         self.progress = nil
         self.overallFraction = nil
+        self.pendingPassword = nil
+        self.pendingEncoding = nil
         self.cancellation = CancellationToken()
+    }
+
+    func attachPendingPassword(_ password: String?) {
+        pendingPassword = password
+    }
+
+    func attachPendingEncoding(_ encoding: String?) {
+        pendingEncoding = encoding
     }
 
     func updateState(_ next: JobState) {

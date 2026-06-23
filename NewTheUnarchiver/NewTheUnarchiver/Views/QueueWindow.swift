@@ -10,6 +10,7 @@ enum QueueWindowAccessibility {
 
 struct QueueWindow: View {
     let model: AppModel
+    let scheduler: Scheduler
     let onOpen: ([URL]) -> Bool
 
     @State private var isDropTargeted: Bool = false
@@ -59,7 +60,7 @@ struct QueueWindow: View {
     private var queueList: some View {
         List {
             ForEach(model.queue) { job in
-                JobRowView(job: job) { model.cancel(job) }
+                JobRowView(job: job, model: model, scheduler: scheduler)
                     .accessibilityIdentifier(QueueWindowAccessibility.row(for: job.id))
             }
         }
