@@ -24,10 +24,7 @@ final class AppModel {
                 .map(\.url)
         )
         for url in urls {
-            // Directories aren't archives. `hasDirectoryPath` catches the
-            // trailing-slash form; `isDirectoryKey` covers real-disk URLs
-            // delivered without a trailing slash (File ▸ Open…, onOpenURLs).
-            guard !Self.isDirectory(url) else { continue }
+            guard Self.isEnqueueable(url) else { continue }
             let standardized = url.standardizedFileURL
             guard !active.contains(standardized) else { continue }
             queue.append(ArchiveJob(url: standardized))
@@ -35,9 +32,14 @@ final class AppModel {
         }
     }
 
-    private static func isDirectory(_ url: URL) -> Bool {
-        if url.hasDirectoryPath { return true }
-        return (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+    /// `onOpenURLs` can in principle deliver any URL the system routes to us
+    /// (custom schemes if we ever declare any in `CFBundleURLTypes`). The
+    /// engine only handles local files; reject everything else. Finder always
+    /// sets a trailing slash on directory URLs, so `hasDirectoryPath` is
+    /// sufficient — no need for a disk-touching `isDirectoryKey` lookup on
+    /// the drop hot path.
+    private static func isEnqueueable(_ url: URL) -> Bool {
+        url.isFileURL && !url.hasDirectoryPath
     }
 
     func remove(_ job: ArchiveJob) {

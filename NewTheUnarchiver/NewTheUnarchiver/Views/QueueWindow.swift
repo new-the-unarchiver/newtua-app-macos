@@ -10,7 +10,7 @@ enum QueueWindowAccessibility {
 
 struct QueueWindow: View {
     let model: AppModel
-    let scheduler: Scheduler
+    let onOpen: ([URL]) -> Bool
 
     @State private var isDropTargeted: Bool = false
 
@@ -24,7 +24,7 @@ struct QueueWindow: View {
         }
         .frame(minWidth: 480, minHeight: 240)
         .dropDestination(for: URL.self) { urls, _ in
-            handleDrop(urls)
+            onOpen(urls)
         } isTargeted: { isTargeted in
             isDropTargeted = isTargeted
         }
@@ -66,11 +66,4 @@ struct QueueWindow: View {
         .listStyle(.inset)
     }
 
-    private func handleDrop(_ urls: [URL]) -> Bool {
-        let before = model.queue.count
-        model.enqueue(urls: urls)
-        let accepted = model.queue.count > before
-        if accepted { scheduler.dispatch() }
-        return accepted
-    }
 }
