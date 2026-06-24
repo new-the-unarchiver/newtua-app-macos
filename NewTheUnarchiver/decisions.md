@@ -1971,3 +1971,48 @@ framework.
   контексте. Workaround через UserDefaults shared group отложен до
   отдельного запроса.
 
+
+---
+
+## 2026-06-24 — /simplify pass на build-newtua-xcframework.sh
+
+После «v1 готов» прогнал `/simplify` на единственном коде Stage 10 —
+shell-скрипте сборки XCFramework. Три параллельных агента (reuse / quality
+/ efficiency). Главная находка — `xcodebuild -create-xcframework` шёл
+**на каждой** Xcode-сборке (~2 с overhead), даже когда dylib не менялся.
+
+**Применено:**
+
+- Early-exit по `mtime`: если embedded-бинарь во фреймворке не старше
+  исходного dylib, заголовка и самого скрипта — выходим до stage'ования
+  framework. Тёплый прогон 0.6 с против холодного ~13 с.
+- Repo-root через `git rev-parse --show-toplevel` вместо `dirname/../..`
+  — согласовано с `apps/macos/CLAUDE.md §2` и со стилем Run Script в
+  pbxproj.
+- Вынесены константы: `FRAMEWORK_VERSION`, `EMBEDDED_BIN`,
+  `INSTALL_NAME`. Раньше `Versions/A` и install_name дублировались в 5+
+  местах.
+- `cargo --locked --quiet` — защита Cargo.lock от drift в
+  Xcode-окружении + тише в build-логе.
+- Убран лишний `chmod 0755` (cargo выставляет 0755, `cp` сохраняет).
+- WHAT-комментарии и нумерация шагов вычищены; оставлены только WHY:
+  про границу с Cargo.toml, про install_name decision, про требуемый
+  layout symlink'ов framework.
+
+**Отклонено / отложено:**
+
+- Удаление мёртвой `bindings/swift/Sources/CNewtua/` (modulemap + symlink
+  на header) — формально C-обёртка близка к Rust-зоне. Помечено в
+  memory как «править осторожно, лучше Rust-агенту»; оставил
+  пользователю на решение.
+- Дублирование `export PATH` между скриптом и Run Script в pbxproj —
+  безвредная избыточность, pbxproj при открытом Xcode не правлю
+  (memory: `feedback_no_pbxproj_edits.md`).
+- Skew `MACOSX_DEPLOYMENT_TARGET=26.0` (скрипт) vs `26.5` (app deployment
+  target) — это разные вещи: 26.0 — нижняя граница ELF dylib, 26.5 —
+  целевая версия app. Оставил.
+
+**Git-коммит:** `4988217` `refactor(gui): /simplify pass on
+build-newtua-xcframework.sh`. Тесты не пересобирал — скрипт
+смокается дважды (cold + hot) и `BuildProject` Debug прошёл 0 errors.
+
