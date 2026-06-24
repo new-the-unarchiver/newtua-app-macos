@@ -1,5 +1,11 @@
 # План разработки macOS GUI для NewTheUnarchiver
 
+> **Статус на 2026-06-24: v1 готов.** Все 10 этапов плюс 10.1 закрыты,
+> финальная проверка пройдена, запись «v1 готов» в `decisions.md`
+> от 2026-06-24. Этот файл оставлен как исторический документ хода
+> разработки — отметки `✅` на этапах ниже отражают факт завершения.
+> Для актуального состояния документа сверяться с `decisions.md`.
+
 ## Контекст
 
 Возвращаем сообществу легендарный The Unarchiver — модернизируем его GUI на
@@ -699,19 +705,22 @@ isolation-атрибуты видимыми.
 
 ---
 
-## Финальная проверка релиза v1
+## Финальная проверка релиза v1 ✅ пройдена 2026-06-24
 
-После завершения всех 10 этапов:
+Все 6 пунктов закрыты (полная запись — `decisions.md` 2026-06-24
+«v1 готов»):
 
-1. `cargo build -p newtua-ffi --release --target aarch64-apple-darwin`
-   чисто собирается (выполняется build-скриптом этапа 10).
-2. `cd bindings/swift && swift test` — все 20/20 зелёные против
-   XCFramework.
-3. `BuildProject` в Xcode — без warnings, **Debug + Release**.
-4. `XcodeListNavigatorIssues` — пусто.
-5. Все тесты в `NewTheUnarchiverTests` и `NewTheUnarchiverUITests` —
-   зелёные.
-6. Записать «v1 готов, дата» в `decisions.md`.
+1. ✅ `cargo build -p newtua-ffi --release --target aarch64-apple-darwin`
+   — зелёный (выполняется внутри
+   `apps/macos/tools/build-newtua-xcframework.sh`).
+2. ✅ `cd bindings/swift && swift test` — 20/20 против XCFramework.
+3. ✅ `BuildProject` Debug + Release — без warnings, без errors.
+4. ✅ `XcodeListNavigatorIssues` (severity=warning) — 0 issues.
+5. ✅ `NewTheUnarchiverTests` 248/248, `NewTheUnarchiverUITests` 4/4.
+6. ✅ «v1 готов, 2026-06-24» в `decisions.md`.
+
+Размер релизного бандла — 4.2 МБ (~12× меньше pre-Stage 10 за счёт
+перехода на dynamic framework и устранения дубля Rust-кода в `.appex`).
 
 ---
 
