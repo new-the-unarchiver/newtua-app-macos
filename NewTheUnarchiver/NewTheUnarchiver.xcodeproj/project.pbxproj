@@ -7,10 +7,20 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		4E4D157E2FEB0CF2006D56D6 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E4D157D2FEB0CF2006D56D6 /* Quartz.framework */; };
+		4E4D158A2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4E4D157C2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		4E4D15982FEBB0DA006D56D6 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E4D15972FEBB0DA006D56D6 /* Newtua */; };
 		4E8DD5BF2FE9852D006C49C2 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E8DD5BE2FE9852D006C49C2 /* Newtua */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		4E4D15882FEB0CF2006D56D6 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 4E8DD5872FE97BB4006C49C2 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4E4D157B2FEB0CF2006D56D6;
+			remoteInfo = NewTheUnarchiverQuickLook;
+		};
 		4E8DD59F2FE97BB5006C49C2 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 4E8DD5872FE97BB4006C49C2 /* Project object */;
@@ -27,13 +37,50 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		4E4D158F2FEB0CF2006D56D6 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4E4D158A2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
+		4E4D157C2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NewTheUnarchiverQuickLook.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		4E4D157D2FEB0CF2006D56D6 /* Quartz.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Quartz.framework; path = System/Library/Frameworks/Quartz.framework; sourceTree = SDKROOT; };
 		4E8DD58F2FE97BB4006C49C2 /* NewTheUnarchiver.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NewTheUnarchiver.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E8DD59E2FE97BB5006C49C2 /* NewTheUnarchiverTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NewTheUnarchiverTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4E8DD5A82FE97BB5006C49C2 /* NewTheUnarchiverUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NewTheUnarchiverUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4E4D158E2FEB0CF2006D56D6 /* Exceptions for "NewTheUnarchiverQuickLook" folder in "NewTheUnarchiverQuickLook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 4E4D157B2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */;
+		};
+		4E4D15912FEBAFFE006D56D6 /* Exceptions for "NewTheUnarchiver" folder in "NewTheUnarchiverQuickLook" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Engine/MacOSSidecars.swift,
+				QuickLook/ArchiveSummary.swift,
+				QuickLook/ArchiveTreeBuilder.swift,
+				QuickLook/ExpansionPolicy.swift,
+				QuickLook/HTMLPreviewRenderer.swift,
+				QuickLook/IconCatalog.swift,
+				QuickLook/PreviewInputEntry.swift,
+				QuickLook/TreeNode.swift,
+			);
+			target = 4E4D157B2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */;
+		};
 		4E8DD60A2FEA6795006C49C2 /* Exceptions for "NewTheUnarchiver" folder in "NewTheUnarchiver" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -44,10 +91,19 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		4E4D157F2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4E4D158E2FEB0CF2006D56D6 /* Exceptions for "NewTheUnarchiverQuickLook" folder in "NewTheUnarchiverQuickLook" target */,
+			);
+			path = NewTheUnarchiverQuickLook;
+			sourceTree = "<group>";
+		};
 		4E8DD5912FE97BB4006C49C2 /* NewTheUnarchiver */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
 				4E8DD60A2FEA6795006C49C2 /* Exceptions for "NewTheUnarchiver" folder in "NewTheUnarchiver" target */,
+				4E4D15912FEBAFFE006D56D6 /* Exceptions for "NewTheUnarchiver" folder in "NewTheUnarchiverQuickLook" target */,
 			);
 			path = NewTheUnarchiver;
 			sourceTree = "<group>";
@@ -65,6 +121,15 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		4E4D15792FEB0CF2006D56D6 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4E4D15982FEBB0DA006D56D6 /* Newtua in Frameworks */,
+				4E4D157E2FEB0CF2006D56D6 /* Quartz.framework in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4E8DD58C2FE97BB4006C49C2 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -96,6 +161,7 @@
 				4E8DD5912FE97BB4006C49C2 /* NewTheUnarchiver */,
 				4E8DD5A12FE97BB5006C49C2 /* NewTheUnarchiverTests */,
 				4E8DD5AB2FE97BB5006C49C2 /* NewTheUnarchiverUITests */,
+				4E4D157F2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */,
 				4E8DD5BD2FE9852D006C49C2 /* Frameworks */,
 				4E8DD5902FE97BB4006C49C2 /* Products */,
 			);
@@ -107,6 +173,7 @@
 				4E8DD58F2FE97BB4006C49C2 /* NewTheUnarchiver.app */,
 				4E8DD59E2FE97BB5006C49C2 /* NewTheUnarchiverTests.xctest */,
 				4E8DD5A82FE97BB5006C49C2 /* NewTheUnarchiverUITests.xctest */,
+				4E4D157C2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -114,6 +181,7 @@
 		4E8DD5BD2FE9852D006C49C2 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				4E4D157D2FEB0CF2006D56D6 /* Quartz.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -121,6 +189,29 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		4E4D157B2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4E4D158B2FEB0CF2006D56D6 /* Build configuration list for PBXNativeTarget "NewTheUnarchiverQuickLook" */;
+			buildPhases = (
+				4E4D15782FEB0CF2006D56D6 /* Sources */,
+				4E4D15792FEB0CF2006D56D6 /* Frameworks */,
+				4E4D157A2FEB0CF2006D56D6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4E4D157F2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */,
+			);
+			name = NewTheUnarchiverQuickLook;
+			packageProductDependencies = (
+				4E4D15972FEBB0DA006D56D6 /* Newtua */,
+			);
+			productName = NewTheUnarchiverQuickLook;
+			productReference = 4E4D157C2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		4E8DD58E2FE97BB4006C49C2 /* NewTheUnarchiver */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4E8DD5B22FE97BB5006C49C2 /* Build configuration list for PBXNativeTarget "NewTheUnarchiver" */;
@@ -129,10 +220,12 @@
 				4E8DD58B2FE97BB4006C49C2 /* Sources */,
 				4E8DD58C2FE97BB4006C49C2 /* Frameworks */,
 				4E8DD58D2FE97BB4006C49C2 /* Resources */,
+				4E4D158F2FEB0CF2006D56D6 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4E4D15892FEB0CF2006D56D6 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				4E8DD5912FE97BB4006C49C2 /* NewTheUnarchiver */,
@@ -201,6 +294,9 @@
 				LastSwiftUpdateCheck = 2650;
 				LastUpgradeCheck = 2650;
 				TargetAttributes = {
+					4E4D157B2FEB0CF2006D56D6 = {
+						CreatedOnToolsVersion = 26.5;
+					};
 					4E8DD58E2FE97BB4006C49C2 = {
 						CreatedOnToolsVersion = 26.5;
 					};
@@ -234,11 +330,19 @@
 				4E8DD58E2FE97BB4006C49C2 /* NewTheUnarchiver */,
 				4E8DD59D2FE97BB5006C49C2 /* NewTheUnarchiverTests */,
 				4E8DD5A72FE97BB5006C49C2 /* NewTheUnarchiverUITests */,
+				4E4D157B2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		4E4D157A2FEB0CF2006D56D6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4E8DD58D2FE97BB4006C49C2 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -285,6 +389,13 @@
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		4E4D15782FEB0CF2006D56D6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		4E8DD58B2FE97BB4006C49C2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -309,6 +420,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		4E4D15892FEB0CF2006D56D6 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4E4D157B2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook */;
+			targetProxy = 4E4D15882FEB0CF2006D56D6 /* PBXContainerItemProxy */;
+		};
 		4E8DD5A02FE97BB5006C49C2 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 4E8DD58E2FE97BB4006C49C2 /* NewTheUnarchiver */;
@@ -322,6 +438,68 @@
 /* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
+		4E4D158C2FEB0CF2006D56D6 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5FVC5YT2B5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NewTheUnarchiverQuickLook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NewTheUnarchiverQuickLook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aleksei.trankov.NewTheUnarchiver.NewTheUnarchiverQuickLook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		4E4D158D2FEB0CF2006D56D6 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5FVC5YT2B5;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = NewTheUnarchiverQuickLook/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = NewTheUnarchiverQuickLook;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = aleksei.trankov.NewTheUnarchiver.NewTheUnarchiverQuickLook;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
 		4E8DD5B02FE97BB5006C49C2 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -589,6 +767,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		4E4D158B2FEB0CF2006D56D6 /* Build configuration list for PBXNativeTarget "NewTheUnarchiverQuickLook" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4E4D158C2FEB0CF2006D56D6 /* Debug */,
+				4E4D158D2FEB0CF2006D56D6 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 		4E8DD58A2FE97BB4006C49C2 /* Build configuration list for PBXProject "NewTheUnarchiver" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -635,6 +822,11 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		4E4D15972FEBB0DA006D56D6 /* Newtua */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			productName = Newtua;
+		};
 		4E8DD5BE2FE9852D006C49C2 /* Newtua */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;

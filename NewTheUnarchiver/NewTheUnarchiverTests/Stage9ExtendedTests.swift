@@ -222,7 +222,8 @@ struct Stage9HTMLRendererExtendedTests {
         let html = render([
             TreeNode.file(name: "secret.bin", path: "secret.bin", size: 1, mtime: nil)
         ], encrypted: true)
-        #expect(html.contains("encrypted"))
+        // Locale-independent: marker class is stable across translations.
+        #expect(html.contains("class=\"locked state\""))
         #expect(!html.contains("secret.bin"))
     }
 

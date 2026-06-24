@@ -5,13 +5,15 @@ import Foundation
 /// hostile archive entries from injecting markup into the preview shell.
 enum HTMLPreviewRenderer {
 
-    /// Bundle of per-render dependencies — formatters and policy — so
-    /// recursive node-render calls take one `ctx` parameter instead of
-    /// threading three independent values through every level.
+    /// Bundle of per-render dependencies — formatters, policy, and a
+    /// pre-resolved plural format string for the per-folder item count
+    /// (hoisted out of the recursive walk).
     private struct RenderContext {
         let policy: ExpansionPolicy
         let sizeStyle: ByteCountFormatStyle
         let dateFormatter: DateFormatter
+        let bundle: Bundle
+        let itemCountFormat: String
     }
 
     static func render(
@@ -20,7 +22,8 @@ enum HTMLPreviewRenderer {
         encrypted: Bool,
         policy: ExpansionPolicy,
         locale: Locale,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        bundle: Bundle = .main
     ) -> Data {
         let sizeStyle = ByteCountFormatStyle(
             style: .file, allowedUnits: .all,
@@ -34,14 +37,19 @@ enum HTMLPreviewRenderer {
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .short
 
-        let ctx = RenderContext(
-            policy: policy, sizeStyle: sizeStyle, dateFormatter: dateFormatter
+        let itemCountFormat = NSLocalizedString(
+            "preview.folder.itemCount", bundle: bundle, value: "%d items", comment: ""
         )
 
-        // Rough heuristic so the final HTML rarely reallocates: each entry
-        // contributes ~250 bytes of markup; plus shell + style.
+        let ctx = RenderContext(
+            policy: policy, sizeStyle: sizeStyle, dateFormatter: dateFormatter,
+            bundle: bundle, itemCountFormat: itemCountFormat
+        )
+
+        var nodeCount = 0
+        tree.walk { _ in nodeCount += 1 }
         var html = ""
-        html.reserveCapacity(2_048 + countNodes(tree) * 256)
+        html.reserveCapacity(2_048 + nodeCount * 256)
 
         html += "<!DOCTYPE html>\n"
         html += "<html><head><meta charset=\"utf-8\">"
@@ -50,15 +58,17 @@ enum HTMLPreviewRenderer {
         html += "</title>"
         html += styleBlock()
         html += "</head><body>"
+
         html += "<header class=\"title\">"
         appendEscaped(archiveName, to: &html)
         html += "</header>"
 
         if encrypted {
-            html += encryptedFallback()
+            appendEncryptedFallback(ctx: ctx, into: &html)
         } else if tree.isEmpty {
-            html += emptyState()
+            appendEmptyState(ctx: ctx, into: &html)
         } else {
+            appendSummary(for: tree, ctx: ctx, into: &html)
             html += "<ul class=\"tree\">"
             for node in tree {
                 appendNode(node, isRoot: true, ctx: ctx, into: &html)
@@ -70,7 +80,33 @@ enum HTMLPreviewRenderer {
         return Data(html.utf8)
     }
 
-    // MARK: - Node rendering (append into shared buffer)
+    // MARK: - Header summary
+
+    private static func appendSummary(
+        for tree: [TreeNode], ctx: RenderContext, into out: inout String
+    ) {
+        let s = ArchiveSummary.summarize(tree)
+        let filesText = localizedPlural(
+            key: "preview.summary.files",
+            defaultFormat: "%d files",
+            count: s.files, ctx: ctx
+        )
+        let foldersText = localizedPlural(
+            key: "preview.summary.folders",
+            defaultFormat: "%d folders",
+            count: s.folders, ctx: ctx
+        )
+        let size = Int64(s.totalBytes).formatted(ctx.sizeStyle)
+        out += "<div class=\"summary\">"
+        appendEscaped(filesText, to: &out)
+        out += " · "
+        appendEscaped(foldersText, to: &out)
+        out += " · "
+        appendEscaped(size, to: &out)
+        out += "</div>"
+    }
+
+    // MARK: - Node rendering
 
     private static func appendNode(
         _ node: TreeNode, isRoot: Bool, ctx: RenderContext, into out: inout String
@@ -88,22 +124,39 @@ enum HTMLPreviewRenderer {
     ) {
         let kindClass = node.kind == .symlink ? "leaf symlink" : "leaf file"
         out += "<li class=\"\(kindClass)\">"
+        out += "<span class=\"chevron-spacer\"></span>"
+        appendIcon(for: node, into: &out)
         out += "<span class=\"name\">"
         appendEscaped(node.name, to: &out)
         out += "</span>"
-        appendMetaSpans(for: node, ctx: ctx, into: &out)
+        out += "<span class=\"count\"></span>"
+        appendDateAndSize(for: node, ctx: ctx, into: &out)
         out += "</li>"
     }
 
     private static func appendDirectory(
         _ node: TreeNode, isRoot: Bool, ctx: RenderContext, into out: inout String
     ) {
-        let open = ctx.policy.shouldExpand(node, isRoot: isRoot) ? " open" : ""
-        out += "<li class=\"branch dir\"><details\(open)>"
-        out += "<summary><span class=\"name\">"
+        let isOpen = ctx.policy.shouldExpand(node, isRoot: isRoot)
+        let openAttr = isOpen ? " open" : ""
+        out += "<li class=\"branch dir\"><details\(openAttr)>"
+        out += "<summary>"
+        out += "<span class=\"chevron\"></span>"
+        appendIcon(for: node, into: &out)
+        out += "<span class=\"name\">"
         appendEscaped(node.name, to: &out)
         out += "</span>"
-        appendMetaSpans(for: node, ctx: ctx, into: &out)
+        // Counts shown only when collapsed — otherwise the visible children
+        // are themselves the answer, the inline number is noise.
+        if !isOpen {
+            let text = String.localizedStringWithFormat(ctx.itemCountFormat, node.children.count)
+            out += "<span class=\"count\">"
+            appendEscaped(text, to: &out)
+            out += "</span>"
+        } else {
+            out += "<span class=\"count\"></span>"
+        }
+        appendDateAndSize(for: node, ctx: ctx, into: &out)
         out += "</summary>"
         out += "<ul>"
         for child in node.children {
@@ -112,13 +165,17 @@ enum HTMLPreviewRenderer {
         out += "</ul></details></li>"
     }
 
+    private static func appendIcon(for node: TreeNode, into out: inout String) {
+        let id = IconCatalog.cid(for: node)
+        out += "<img class=\"icon\" src=\"cid:\(id)\" alt=\"\">"
+    }
+
     /// Empty `.date`/`.size` spans are required even when there is no
-    /// value: the CSS grid uses fixed columns and skips would misalign
-    /// the rest of the row.
-    private static func appendMetaSpans(
+    /// value: the CSS grid uses fixed columns and skipping them would
+    /// misalign the rest of the row.
+    private static func appendDateAndSize(
         for node: TreeNode, ctx: RenderContext, into out: inout String
     ) {
-        out += "<span class=\"kind\">\(kindLabel(node.kind))</span>"
         appendMetaSpan(class: "date", text: node.mtime.map(ctx.dateFormatter.string(from:)), into: &out)
         appendMetaSpan(class: "size", text: node.size.map { Int64($0).formatted(ctx.sizeStyle) }, into: &out)
     }
@@ -129,22 +186,44 @@ enum HTMLPreviewRenderer {
         out += "</span>"
     }
 
-    private static func kindLabel(_ kind: TreeNode.Kind) -> String {
-        switch kind {
-        case .file: "File"
-        case .directory: "Folder"
-        case .symlink: "Symlink"
-        }
-    }
-
     // MARK: - States
 
-    private static func emptyState() -> String {
-        "<div class=\"empty state\"><p>Archive is empty.</p></div>"
+    private static func appendEmptyState(ctx: RenderContext, into out: inout String) {
+        out += "<div class=\"empty state\"><p>"
+        appendEscaped(localized(key: "preview.state.empty",
+                                defaultValue: "Archive is empty.", ctx: ctx),
+                      to: &out)
+        out += "</p></div>"
     }
 
-    private static func encryptedFallback() -> String {
-        "<div class=\"locked state\"><p>This archive is encrypted.</p></div>"
+    private static func appendEncryptedFallback(ctx: RenderContext, into out: inout String) {
+        out += "<div class=\"locked state\"><p>"
+        appendEscaped(localized(key: "preview.state.encrypted",
+                                defaultValue: "This archive is encrypted.", ctx: ctx),
+                      to: &out)
+        out += "</p></div>"
+    }
+
+    // MARK: - Localization helpers
+    //
+    // Bundle defaults to `.main` at render entry — that maps to the main
+    // app's bundle in app/test context and to the extension's bundle in
+    // the Quick Look extension. Each bundle ships its own
+    // `Localizable.xcstrings`. If a translation is missing, the
+    // `defaultValue` / `defaultFormat` keeps the English text.
+
+    private static func localized(key: String, defaultValue: String, ctx: RenderContext) -> String {
+        NSLocalizedString(key, bundle: ctx.bundle, value: defaultValue, comment: "")
+    }
+
+    /// Plural-aware. The format must contain `%d` for the count. xcstrings
+    /// stores the plural variations per locale (one/few/many/other) and
+    /// `String.localizedStringWithFormat` resolves through them.
+    private static func localizedPlural(
+        key: String, defaultFormat: String, count: Int, ctx: RenderContext
+    ) -> String {
+        let format = NSLocalizedString(key, bundle: ctx.bundle, value: defaultFormat, comment: "")
+        return String.localizedStringWithFormat(format, count)
     }
 
     // MARK: - HTML escaping
@@ -182,31 +261,60 @@ enum HTMLPreviewRenderer {
         return false
     }
 
-    private static func countNodes(_ nodes: [TreeNode]) -> Int {
-        var n = 0
-        for node in nodes {
-            n += 1 + countNodes(node.children)
-        }
-        return n
-    }
-
     // MARK: - Style
 
     private static func styleBlock() -> String {
         """
         <style>
-        :root { color-scheme: light dark; font: 13px -apple-system, system-ui, sans-serif; }
+        :root {
+            color-scheme: light dark;
+            font: 13px -apple-system, system-ui, sans-serif;
+            --row-hover: rgba(127,127,127,0.10);
+            --rule: rgba(127,127,127,0.22);
+            --dim: rgba(127,127,127,0.95);
+            --meta-font-size: 12px;
+        }
         body { margin: 0; padding: 12px 16px; }
-        header.title { font-weight: 600; padding-bottom: 8px; border-bottom: 1px solid rgba(128,128,128,0.3); margin-bottom: 8px; }
+        header.title {
+            font-weight: 600; padding-bottom: 4px;
+            border-bottom: 1px solid var(--rule); margin-bottom: 4px;
+        }
+        .summary {
+            color: var(--dim); padding-bottom: 8px;
+            border-bottom: 1px solid var(--rule); margin-bottom: 6px;
+            font-size: var(--meta-font-size);
+        }
         ul.tree, ul.tree ul { list-style: none; padding-left: 18px; margin: 0; }
         ul.tree { padding-left: 0; }
-        li.branch > details > summary, li.leaf { display: grid; grid-template-columns: 1fr 90px 130px 90px; gap: 8px; align-items: baseline; padding: 2px 0; }
-        li.leaf .name { padding-left: 14px; }
-        details summary { cursor: pointer; list-style: revert; }
+        li.branch > details > summary, li.leaf {
+            display: grid;
+            grid-template-columns: 12px 18px 1fr auto 140px 90px;
+            gap: 6px;
+            align-items: center;
+            padding: 3px 6px;
+            border-radius: 4px;
+        }
+        li.branch > details > summary:hover, li.leaf:hover { background: var(--row-hover); }
+        details summary { cursor: pointer; }
+        details summary::-webkit-details-marker { display: none; }
+        details summary::marker { content: ""; }
+        .chevron, .chevron-spacer { width: 12px; text-align: center; color: var(--dim); }
+        .chevron::before { content: "▸"; }
+        details[open] > summary .chevron::before { content: "▾"; }
+        .icon {
+            width: 18px; height: 18px;
+            object-fit: contain;
+            vertical-align: middle;
+        }
         .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .kind, .date, .size { color: rgba(128,128,128,0.95); font-variant-numeric: tabular-nums; }
+        .count, .date, .size {
+            color: var(--dim);
+            font-variant-numeric: tabular-nums;
+            font-size: var(--meta-font-size);
+        }
+        .count { text-align: right; padding: 0 8px; }
         .size { text-align: right; }
-        .state { padding: 24px; text-align: center; opacity: 0.7; }
+        .state { padding: 32px; text-align: center; opacity: 0.7; }
         </style>
         """
     }

@@ -34,4 +34,19 @@ struct TreeNode: Equatable, Sendable {
     static func symlink(name: String, path: String, size: UInt64, mtime: Date?) -> TreeNode {
         TreeNode(name: name, path: path, kind: .symlink, size: size, mtime: mtime, children: [])
     }
+
+    /// Pre-order DFS: `visit` is called on each node before its children.
+    /// Centralised so `ArchiveSummary`, `IconCatalog.uniqueCIDs`, and
+    /// `HTMLPreviewRenderer.countNodes` don't each re-implement the walk.
+    func walk(_ visit: (TreeNode) -> Void) {
+        visit(self)
+        for child in children { child.walk(visit) }
+    }
+}
+
+extension Array where Element == TreeNode {
+    /// Pre-order DFS over a forest.
+    func walk(_ visit: (TreeNode) -> Void) {
+        for node in self { node.walk(visit) }
+    }
 }
