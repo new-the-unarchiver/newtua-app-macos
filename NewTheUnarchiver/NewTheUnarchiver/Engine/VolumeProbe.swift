@@ -12,7 +12,7 @@ enum VolumeMediumType: Sendable, Equatable {
 
 /// Asks the OS about the volume backing a URL. Pure read-only contract;
 /// implementations may cache by mount path.
-protocol VolumeProbing: Sendable {
+nonisolated protocol VolumeProbing: Sendable {
     func isInternal(_ url: URL) -> Bool
     func mediumType(_ url: URL) -> VolumeMediumType
 }
@@ -26,7 +26,7 @@ protocol VolumeProbing: Sendable {
 /// Anything not internal is `.unknown`, which the predicate treats as
 /// serial-only. A full IOKit + Disk Arbitration probe is tracked as a
 /// v1.1 improvement.
-final class SystemVolumeProbe: VolumeProbing, @unchecked Sendable {
+nonisolated final class SystemVolumeProbe: VolumeProbing, @unchecked Sendable {
     private struct Reading {
         let isInternal: Bool
         let medium: VolumeMediumType

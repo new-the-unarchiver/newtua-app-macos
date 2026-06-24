@@ -9,7 +9,7 @@ import Newtua
 /// expected to serialize `feed`/`flush` calls. `@unchecked Sendable` is the
 /// asserted form of that contract — it lets the throttle be captured by the
 /// engine's `@Sendable` progress closure without lockless cross-thread access.
-final class ProgressThrottle: @unchecked Sendable {
+nonisolated final class ProgressThrottle: @unchecked Sendable {
     private let interval: TimeInterval
     private let now: @Sendable () -> Date
     private var lastEmit: Date

@@ -1789,3 +1789,137 @@ IconCatalog (cid, утечки cid, UT-резолвинг), ArchiveSummary
   байт — нужно отдельно подставить системную locale или передавать
   user-language из основного приложения через UserDefaults shared
   group. Откладываем до отдельного запроса от пользователя.
+
+---
+
+## 2026-06-24 — Этап 10. XCFramework и release-распространение: принятые решения
+
+**Контекст.** При формальной сверке статуса v1 выяснилось, что Release
+Xcode-сборка некорректна: `bindings/swift/Package.swift` через
+`unsafeFlags` жёстко указывает на `target/debug/libnewtua_ffi.a`. То
+есть Release Swift-таргета линкуется с debug-Rust-кодом. Параллельно
+Quick Look-extension (`NewTheUnarchiverQuickLook`) использует
+`import Newtua` и через C-ABI открывает архивы сам — то есть статическая
+библиотека линкуется **дважды** (в `.app` и в `.appex`). Для релиза это
+неприемлемо. Добавляем Этап 10.
+
+**Замеренные размеры** (Debug `.app` на arm64):
+- `target/debug/libnewtua_ffi.a` — 98 МБ.
+- `NewTheUnarchiver.app/Contents/MacOS/NewTheUnarchiver.debug.dylib` — 23 МБ.
+- `Contents/PlugIns/NewTheUnarchiverQuickLook.appex` — 22 МБ.
+
+Release dylib `libnewtua_ffi.dylib` — 2,1 МБ (замерено Rust-агентом).
+
+**Решения:**
+
+1. **Динамическая библиотека вместо статической.** В Newtua-сборке для
+   распространения используется `libnewtua_ffi.dylib` через
+   `Newtua.framework`. Static-вариант `.a` продолжает существовать —
+   нужен CLI/TUI/тестам ядра.
+   - **Почему:** одна копия движка на bundle вместо двух. Release
+     dylib (2,1 МБ) после Embed & Sign живёт в
+     `.app/Contents/Frameworks/Newtua.framework/`, extension использует
+     её через `@rpath` без своей копии.
+
+2. **Архитектура — только `aarch64-apple-darwin`.** Universal
+   `arm64 + x86_64` не делаем.
+   - **Почему:** проект targets macOS 26+ (Liquid Glass) на Apple
+     Silicon. Поддержки Intel-Mac не планируется.
+
+3. **`MACOSX_DEPLOYMENT_TARGET=26.0` через env в build-скрипте.** Не в
+   `Cargo.toml`, не в rustflags.
+   - **Почему:** прокинуть deployment target в cargo/rustc — это
+     платформо-специфичное решение macOS-GUI, в кросс-платформенном
+     ядре ему делать нечего.
+
+4. **`install_name` dylib задаёт macOS-GUI через `install_name_tool`.**
+   После сборки framework в скрипте: `install_name_tool -id
+   @rpath/Newtua.framework/Versions/A/Newtua ...`. В ядре Rust ничего
+   не меняется.
+   - **Почему:** имя framework — решение о компоновке macOS-бандла,
+     живёт в `apps/macos/`. Зашить путь в `newtua-ffi` означает
+     привязать кросс-платформенное ядро к нашему имени bundle.
+
+5. **XCFramework в git не коммитим.** Артефакт сборки, в `.gitignore`.
+   Генерируется скриптом `apps/macos/tools/build-newtua-xcframework.sh`.
+   - **Почему:** размер ~10+ МБ, регенерируется одной командой,
+     зависимость от Rust toolchain у разработчика macOS-app сохраняется
+     (но у конечного пользователя app — нет).
+
+6. **Имя framework — `Newtua`.** Бандл `Newtua.framework`, продукт
+   SwiftPM-пакета тоже `Newtua` — согласовано.
+
+7. **Зона ответственности зафиксирована.** Правки `Cargo.toml`,
+   `crates/`, `bindings/swift/Package.swift`, `.cargo/config.toml` — НЕ
+   через macOS-GUI агента. Любая нужная правка идёт через handoff в
+   `docs/handoff-<дата>-<тема>.md`. Ответ — `docs/reply-<дата>-<тема>.md`.
+
+**Состоявшийся handoff:**
+- Запрос:
+  `docs/handoff-2026-06-24-newtua-ffi-cdylib.md`.
+- Ответ Rust-агента:
+  `docs/reply-2026-06-24-newtua-ffi-cdylib.md`.
+
+Ключевой ответ: `cdylib` уже в `crate-type = ["staticlib", "cdylib",
+"rlib"]` с первого FFI-коммита. В ядре менять ничего не нужно. Release
+dylib собирается командой
+`MACOSX_DEPLOYMENT_TARGET=26.0 cargo build -p newtua-ffi --release
+--target aarch64-apple-darwin`.
+
+**Уроки от handoff'а (зафиксированы в memory):**
+- Не предлагать сниппеты `Cargo.toml` «по памяти». В handoff я выдал
+  два неверных сниппета (без `rlib` сломал бы тесты; `rustflags` в
+  `Cargo.toml` Cargo не читает) — Rust-агент их правильно отклонил.
+
+---
+
+## 2026-06-24 — Stage 10.1: устранение 6 strict-concurrency warnings
+
+**Контекст.** После перехода Newtua на dynamic library (Этап 10) в
+сборке `NewTheUnarchiver` появились 6 Swift 6 warnings про вызов
+main-actor-isolated кода из nonisolated-контекста. Полный handoff
+прошлой сессии — `handoff-2026-06-24-mainactor-warnings.md`.
+
+**Корень.** В `project.pbxproj` (строки 675, 707) у app-таргета
+выставлено `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`. Это сознательное
+решение Swift 6.2 — UI-приложение по умолчанию на main-actor, явные
+исключения помечаются `nonisolated`. До Этапа 10 компилятор не видел
+триггер на «движковых» типах, потому что они были инлайнены в одной
+статической библиотеке; динамическая граница framework сделала
+isolation-атрибуты видимыми.
+
+**Решение — Подход A** (точечная разметка `nonisolated`):
+
+1. **`MacOSSidecars`** (Engine/MacOSSidecars.swift) — два `static func
+   matches(_:)` помечаем `nonisolated`. Это stateless enum; вызывается
+   из `JobRunner.topLevelItemCount` (nonisolated static) и
+   `ArchiveTreeBuilder.insert` (pure-функция).
+
+2. **`VolumeProbing`** (Engine/VolumeProbe.swift) — protocol помечаем
+   `nonisolated`. `SystemVolumeProbe` — `nonisolated final class`
+   с явным `nonisolated init()`. Состояние защищено
+   `OSAllocatedUnfairLock`, всё уже Sendable-safe.
+
+3. **`ProgressThrottle`** (Engine/ProgressThrottle.swift) — `final
+   class` остаётся `@unchecked Sendable`, методы `init`, `feed`,
+   `flush`, `emit` помечаем `nonisolated`. Контракт «вызовы серийно с
+   extraction-thread» документирован в исходнике, не меняется.
+
+4. **`ExtractionOptions`** (Domain/ExtractionOptions.swift) —
+   `init` и `resolvedExtractURL`/`shouldWrap` помечаем `nonisolated`.
+   Чистый value-type, ничего main-actor-специфичного.
+
+**Почему не Подход B** (отключить `SWIFT_DEFAULT_ACTOR_ISOLATION`):
+- Теряем безопасную автоматическую MainActor-изоляцию для UI-кода
+  (AppModel, Scheduler, JobRunner, все views) — сейчас это работает
+  на нас, а не против.
+- Правка `project.pbxproj` при открытом Xcode запрещена
+  (`feedback_no_pbxproj_edits`).
+
+**Почему не Подход C** (`MainActor.assumeIsolated`):
+- Прячет архитектурную причину. Те же warnings вернутся в новом
+  месте при следующей правке.
+
+**Критерий завершения этапа:** 0 warnings в Debug и Release,
+NewTheUnarchiverTests 241/241, UITests 4/4, git-коммит.
+

@@ -8,7 +8,7 @@ import Foundation
 /// Case-sensitive by engine contract: archives can carry whatever bytes
 /// they want, and we match exactly what the engine matches so the count
 /// and the rendered preview don't drift from reality.
-enum MacOSSidecars {
+nonisolated enum MacOSSidecars {
     static func matches(_ component: String) -> Bool {
         component == "__MACOSX"
             || component == ".DS_Store"

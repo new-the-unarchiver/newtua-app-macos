@@ -1,12 +1,12 @@
 import Foundation
 
-enum WrapperMode: String, Sendable, Equatable, Codable, CaseIterable {
+nonisolated enum WrapperMode: String, Sendable, Equatable, Codable, CaseIterable {
     case never
     case onlyIfMultiple
     case always
 }
 
-enum DestinationStrategy: Sendable, Equatable, Codable {
+nonisolated enum DestinationStrategy: Sendable, Equatable, Codable {
     case nextToArchive
     case fixed(URL)
     case askEachTime
@@ -15,7 +15,7 @@ enum DestinationStrategy: Sendable, Equatable, Codable {
 /// User-facing extraction settings. Persisted to `UserDefaults` by `AppModel`
 /// — see `AppModel.extractionOptionsKey`. Defaults intentionally match the
 /// original The Unarchiver's out-of-the-box behaviour.
-struct ExtractionOptions: Sendable, Equatable, Codable {
+nonisolated struct ExtractionOptions: Sendable, Equatable, Codable {
     var wrapperMode: WrapperMode
     var destinationStrategy: DestinationStrategy
     var openFolderAfter: Bool
