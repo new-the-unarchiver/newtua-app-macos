@@ -555,19 +555,111 @@ png / pdf внутри.
 
 ---
 
+## Этап 10. XCFramework и Release-распространение
+
+**Цель.** Перевести линковку движка с «cargo + статическая `.a`» на
+готовый артефакт `Newtua.xcframework` с динамической библиотекой
+внутри. Без этого Release-сборка некорректна (Package.swift жёстко
+указывает на `target/debug`), а Quick Look-extension получает свою
+дубликатную копию Rust-кода в `.appex` (в Debug это ~22 МБ
+дополнительно к ~23 МБ в app).
+
+**Принятые решения** (см. `decisions.md` за 2026-06-24):
+- Динамическая библиотека (`libnewtua_ffi.dylib`) вместо статической:
+  release-вариант весит ~2,1 МБ против 27 МБ у `.a`. После Embed в
+  `.app/Contents/Frameworks/` — одна копия на bundle.
+- Архитектура — только `aarch64-apple-darwin`. Universal не нужен.
+- `MACOSX_DEPLOYMENT_TARGET=26.0` задаётся env-переменной в скрипте
+  сборки, не в `Cargo.toml`.
+- `install_name` dylib — `@rpath/Newtua.framework/Versions/A/Newtua`,
+  задаётся через `install_name_tool -id` после сборки framework (не в
+  ядре Rust — граница ответственности).
+- XCFramework в git не коммитим — генерируется build-скриптом, попадает
+  в `.gitignore`.
+- В ядре Rust (`crates/`, `Cargo.toml`) **ничего не меняется**:
+  `crate-type = ["staticlib", "cdylib", "rlib"]` уже стоит с первого
+  FFI-коммита. См. `docs/handoff-2026-06-24-newtua-ffi-cdylib.md` и
+  `docs/reply-2026-06-24-newtua-ffi-cdylib.md`.
+
+**Файлы (новые):**
+- `apps/macos/tools/build-newtua-xcframework.sh` — собирает release
+  dylib, упаковывает в `Newtua.framework`, оборачивает в XCFramework.
+- `.gitignore` — добавить `bindings/swift/Newtua.xcframework/`.
+
+**Файлы (правятся):**
+- `bindings/swift/Package.swift` — `unsafeFlags` заменяются на
+  `.binaryTarget(name: "CNewtua", path: "Newtua.xcframework")` плюс
+  системные библиотеки переезжают в `linkerSettings` на Swift-таргете.
+- Xcode-проект:
+  - Build Phase Cargo-скрипт упрощается: вызывает
+    `build-newtua-xcframework.sh` (но **не** делает свой cargo build),
+    и только если XCFramework отсутствует.
+  - Основной таргет `NewTheUnarchiver` — Newtua framework в **Embed &
+    Sign**.
+  - Таргет `NewTheUnarchiverQuickLook` — Newtua framework в **Do Not
+    Embed** (использует embedded в родительский bundle через `@rpath`).
+- `bindings/swift/README.md` — отметка «перед `swift test` собрать
+  XCFramework скриптом».
+
+**Риски и краевые случаи:**
+- `@rpath` resolution для `.appex`: extension живёт в
+  `.app/Contents/PlugIns/X.appex/Contents/MacOS/`, framework — в
+  `.app/Contents/Frameworks/`. Поэтому LC_RPATH у extension должен быть
+  `@executable_path/../../../../Frameworks`. Xcode выставляет его сам
+  при правильной настройке embed flags — но проверить нужно по
+  `otool -l` бинаря extension.
+- Подпись framework и hardened runtime — Xcode сделает автоматически
+  при Embed & Sign, но проверить, что Code Sign Identity у framework
+  совпадает с identity .app/.appex.
+- `swift test` в `bindings/swift/` после перехода на binaryTarget
+  больше не вызывает cargo сам — требуется заранее собранный
+  XCFramework. Если XCFramework нет — `swift test` падает с понятной
+  ошибкой про missing binary. Документируется в `bindings/swift/README.md`.
+- Кэш XCFramework и пересборка: если ABI ядра изменилось, build-скрипт
+  должен принудительно пересобирать XCFramework. Простой способ —
+  удалять старый каталог в начале скрипта.
+
+**TDD-минимум** (smoke-проверки инфраструктуры):
+- `script_produces_xcframework_with_dylib_inside()` — после запуска
+  скрипта в `bindings/swift/Newtua.xcframework/` лежит framework с
+  бинарём.
+- `dylib_has_correct_install_name()` — `otool -D` на собранной dylib
+  показывает `@rpath/Newtua.framework/Versions/A/Newtua`.
+- `appex_does_not_contain_own_rust_code()` — после сборки .app в
+  `Build/Products/Debug/` бинарь `.appex` не содержит rust-символов
+  (через `nm`/`otool -L` проверяем, что Newtua подключается как
+  `@rpath`-зависимость, а не статически).
+
+**Расширенный набор:**
+- BuildProject Debug — зелёный, без warnings.
+- BuildProject Release — зелёный, без warnings.
+- `swift test` в `bindings/swift/` — все 20/20 зелёных против новой
+  XCFramework-сборки.
+- Полный прогон `NewTheUnarchiverTests` (241+) с тайм-аутами — зелёный.
+- Полный прогон `NewTheUnarchiverUITests` — зелёный.
+- Запустить .app из `Products/`, открыть архив через Quick Look (Space
+  в Finder) — extension работает (превью отображается).
+
+**Критерий завершения.** XCFramework собирается одной командой, оба
+таргета линкуются с одной копией Newtua внутри bundle, все тесты
+зелёные, размер .app меньше текущего за счёт устранения дубля Rust-кода
+в `.appex`.
+
+---
+
 ## Финальная проверка релиза v1
 
-После завершения всех 9 этапов:
+После завершения всех 10 этапов:
 
-1. `cargo build -p newtua-ffi` чисто собирается.
-2. `cd bindings/swift && swift test` — всё зелёное.
-3. `BuildProject` в Xcode — без warnings, Debug + Release.
+1. `cargo build -p newtua-ffi --release --target aarch64-apple-darwin`
+   чисто собирается (выполняется build-скриптом этапа 10).
+2. `cd bindings/swift && swift test` — все 20/20 зелёные против
+   XCFramework.
+3. `BuildProject` в Xcode — без warnings, **Debug + Release**.
 4. `XcodeListNavigatorIssues` — пусто.
 5. Все тесты в `NewTheUnarchiverTests` и `NewTheUnarchiverUITests` —
    зелёные.
-6. Ручная проверка: открыть фикстуру каждого поддерживаемого формата
-   обоими способами (drop + double-click) — распаковка проходит.
-7. Записать «v1 готов, дата» в `decisions.md`.
+6. Записать «v1 готов, дата» в `decisions.md`.
 
 ---
 

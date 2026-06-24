@@ -1923,3 +1923,51 @@ isolation-атрибуты видимыми.
 **Критерий завершения этапа:** 0 warnings в Debug и Release,
 NewTheUnarchiverTests 241/241, UITests 4/4, git-коммит.
 
+
+---
+
+## 2026-06-24 — v1 готов
+
+Все 10 этапов плана закрыты. Финальная проверка релиза v1:
+
+- ✅ `cargo build -p newtua-ffi --release --target aarch64-apple-darwin` —
+  зелёный (выполняется внутри `apps/macos/tools/build-newtua-xcframework.sh`).
+- ✅ `cd bindings/swift && swift test` — 20/20.
+- ✅ `BuildProject` Debug — без warnings и errors.
+- ✅ `BuildProject` Release — без warnings и errors (после Stage 10.1
+  убраны 6 main-actor isolation warnings).
+- ✅ `XcodeListNavigatorIssues` (severity=warning) — 0 issues.
+- ✅ `NewTheUnarchiverTests` — **248/248** зелёные (241 после Stage 9 +
+  7 новых из Stage 10.1).
+- ✅ `NewTheUnarchiverUITests` — 4/4 зелёные.
+
+**Размер релизного бандла:** Release `NewTheUnarchiver.app` = **4.2 МБ**.
+- `Contents/Frameworks/CNewtua.framework/` — 2.1 МБ (Rust release dylib).
+- `Contents/Frameworks/Newtua.framework/` — 308 КБ (Swift-обёртка).
+- `Contents/PlugIns/NewTheUnarchiverQuickLook.appex/` — 408 КБ (без своей
+  копии Rust-кода — линкуется через `@rpath` к родительскому app).
+
+Снижение в ~12 раз против Debug-сборки до Этапа 10 (51 МБ) за счёт
+устранения дублирования Rust-кода в `.appex` через переход на dynamic
+framework.
+
+**Что НЕ вошло в v1 (для следующих версий):**
+- Universal-сборка (arm64 + x86_64): целимся только в Apple Silicon.
+  Если когда-то понадобится x86_64 — добавить второй `--target` в
+  `build-newtua-xcframework.sh` и `lipo` перед `xcodebuild
+  -create-xcframework`.
+- Дистрибуция через CI / нотаризация / hardened runtime profile —
+  отдельная работа после первого реального релиза.
+- Стриминговое чтение entry для Quick Look (сейчас вся entry грузится
+  в память, ограничение 100 МБ — задокументировано в Этапе 9).
+- Выбор entry в Quick Look-превью (сейчас показывается дерево всего
+  архива). Расширение до per-entry превью — v2.
+- `keep_macos_metadata` toggle (текущий C-ABI всегда дропает
+  `__MACOSX/`, `._*`, `.DS_Store`). Документировано в `apps/macos/CLAUDE.md §8`.
+
+**Известные нюансы handoff'а от Stage 9 (не блокеры):**
+- Локализация Quick Look extension не подхватывает русский даже на
+  русской системе — Apple ограничивает `Locale.current` в QL-extension
+  контексте. Workaround через UserDefaults shared group отложен до
+  отдельного запроса.
+

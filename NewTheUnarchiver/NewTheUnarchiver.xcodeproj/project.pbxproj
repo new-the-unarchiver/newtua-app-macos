@@ -10,6 +10,8 @@
 		4E4D157E2FEB0CF2006D56D6 /* Quartz.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 4E4D157D2FEB0CF2006D56D6 /* Quartz.framework */; };
 		4E4D158A2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4E4D157C2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4E4D15982FEBB0DA006D56D6 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E4D15972FEBB0DA006D56D6 /* Newtua */; };
+		4E4D163A2FEC38A8006D56D6 /* Newtua in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 4E8DD5BE2FE9852D006C49C2 /* Newtua */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
+		4E4D163D2FEC39C7006D56D6 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E4D163C2FEC39C7006D56D6 /* Newtua */; };
 		4E8DD5BF2FE9852D006C49C2 /* Newtua in Frameworks */ = {isa = PBXBuildFile; productRef = 4E8DD5BE2FE9852D006C49C2 /* Newtua */; };
 /* End PBXBuildFile section */
 
@@ -47,6 +49,27 @@
 				4E4D158A2FEB0CF2006D56D6 /* NewTheUnarchiverQuickLook.appex in Embed Foundation Extensions */,
 			);
 			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4E4D163B2FEC38A8006D56D6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				4E4D163A2FEC38A8006D56D6 /* Newtua in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4E4D163F2FEC39C7006D56D6 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -142,6 +165,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				4E4D163D2FEC39C7006D56D6 /* Newtua in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -221,6 +245,7 @@
 				4E8DD58C2FE97BB4006C49C2 /* Frameworks */,
 				4E8DD58D2FE97BB4006C49C2 /* Resources */,
 				4E4D158F2FEB0CF2006D56D6 /* Embed Foundation Extensions */,
+				4E4D163B2FEC38A8006D56D6 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -245,6 +270,7 @@
 				4E8DD59A2FE97BB5006C49C2 /* Sources */,
 				4E8DD59B2FE97BB5006C49C2 /* Frameworks */,
 				4E8DD59C2FE97BB5006C49C2 /* Resources */,
+				4E4D163F2FEC39C7006D56D6 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -256,6 +282,7 @@
 			);
 			name = NewTheUnarchiverTests;
 			packageProductDependencies = (
+				4E4D163C2FEC39C7006D56D6 /* Newtua */,
 			);
 			productName = NewTheUnarchiverTests;
 			productReference = 4E8DD59E2FE97BB5006C49C2 /* NewTheUnarchiverTests.xctest */;
@@ -384,7 +411,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "  set -euo pipefail\n  export PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\n  cd \"$(git -C \"$SRCROOT\" rev-parse --show-toplevel)\"\n  cargo build -p newtua-ffi\n";
+			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nREPO_ROOT=\"$(git -C \"$SRCROOT\" rev-parse --show-toplevel)\"\n\"$REPO_ROOT/apps/macos/tools/build-newtua-xcframework.sh\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -823,6 +850,11 @@
 
 /* Begin XCSwiftPackageProductDependency section */
 		4E4D15972FEBB0DA006D56D6 /* Newtua */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			productName = Newtua;
+		};
+		4E4D163C2FEC39C7006D56D6 /* Newtua */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
 			productName = Newtua;
