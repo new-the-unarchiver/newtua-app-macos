@@ -647,6 +647,58 @@ png / pdf внутри.
 
 ---
 
+## Этап 10.1 — устранение 6 strict-concurrency warnings ✅ выполнен 2026-06-24
+
+**Цель.** Свести к нулю 6 warnings про «main-actor isolated call from
+nonisolated context», появившихся после перехода Newtua на dynamic
+framework (Этап 10). До этого этапа сборка шла зелёной, но навигатор
+Xcode подсвечивал 6 предупреждений на границе движковых типов и
+nonisolated-вызовов (default-параметры в `init`, `nonisolated static`
+функции, прогресс-колбэк с extraction-thread).
+
+**Корень.** В `project.pbxproj` у app-таргета выставлено
+`SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` (Swift 6.2 «approachable
+concurrency»). Это даёт автоматический `@MainActor` всем типам без
+явной аннотации. До Этапа 10 movement инлайнились компилятором и
+warnings не возникали. Динамическая граница framework сделала
+isolation-атрибуты видимыми.
+
+**Принятые решения** (см. `decisions.md`, секция Stage 10.1):
+- **Подход A — точечная разметка `nonisolated`** на движковых типах:
+  `MacOSSidecars`, `VolumeProbing`/`SystemVolumeProbe`,
+  `ProgressThrottle`, `ExtractionOptions`/`WrapperMode`/
+  `DestinationStrategy`.
+- Подход B (отключить `SWIFT_DEFAULT_ACTOR_ISOLATION`) отклонён —
+  теряли бы автоматическую MainActor-защиту UI-кода и нарушали правило
+  не править pbxproj при открытом Xcode.
+- Подход C (`MainActor.assumeIsolated`) отклонён — прячет корень,
+  возвращает проблему в новом месте при следующей правке.
+
+**Файлы (правятся):**
+- `NewTheUnarchiver/Domain/ExtractionOptions.swift` — три `nonisolated`
+  на `WrapperMode`, `DestinationStrategy`, `ExtractionOptions`.
+- `NewTheUnarchiver/Engine/MacOSSidecars.swift` — `nonisolated enum`.
+- `NewTheUnarchiver/Engine/VolumeProbe.swift` — `nonisolated protocol`
+  + `nonisolated final class SystemVolumeProbe`.
+- `NewTheUnarchiver/Engine/ProgressThrottle.swift` —
+  `nonisolated final class`.
+- `decisions.md` — секция «Stage 10.1».
+
+**Файлы (новые):**
+- `NewTheUnarchiverTests/Stage10ConcurrencyTests.swift` — 7
+  регрессионных тестов, фиксирующих nonisolated-контракт движковых
+  типов (вызов из `Task.detached` и явных `nonisolated` функций).
+
+**Результат:**
+- Debug build: 0 warnings, 0 errors.
+- Release build: 0 warnings, 0 errors.
+- `NewTheUnarchiverTests`: 248/248 (241 старых + 7 новых).
+- `NewTheUnarchiverUITests`: 4/4.
+- Git-коммит: `ce7f2c0` `fix(gui): Stage 10.1 — silence 6 main-actor
+  isolation warnings`.
+
+---
+
 ## Финальная проверка релиза v1
 
 После завершения всех 10 этапов:
