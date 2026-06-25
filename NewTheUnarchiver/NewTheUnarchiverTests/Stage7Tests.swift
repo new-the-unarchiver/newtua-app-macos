@@ -8,16 +8,37 @@ struct Stage7Tests {
 
     // MARK: - SupportedFormats: rich registry
 
-    @Test("Formats registry covers the popular v1 set, with UTI identifier and at least one extension")
-    func formats_coversPopularSet() {
+    @Test("Formats registry covers the Phase 5 set, with UTI identifier and at least one extension")
+    func formats_coversPhase5Set() {
         let utis = Set(SupportedFormats.formats.map(\.utiIdentifier))
-        #expect(utis.contains("public.zip-archive"))
-        #expect(utis.contains("org.7-zip.7-zip-archive"))
-        #expect(utis.contains("com.rarlab.rar-archive"))
-        #expect(utis.contains("public.tar-archive"))
-        #expect(utis.contains("org.gnu.gnu-zip-archive"))
-        #expect(utis.contains("public.bzip2-archive"))
-        #expect(utis.contains("org.tukaani.xz-archive"))
+        let required = [
+            "public.zip-archive",
+            "org.7-zip.7-zip-archive",
+            "com.rarlab.rar-archive",
+            "public.tar-archive",
+            "org.gnu.gnu-zip-archive",
+            "public.bzip2-archive",
+            "org.tukaani.xz-archive",
+            "com.facebook.zstandard-archive",
+            "org.tukaani.lzma-archive",
+            "public.z-archive",
+            "com.winzip.zipx-archive",
+            "com.microsoft.cab",
+            "org.debian.deb-archive",
+            "com.redhat.rpm-archive",
+            "public.cpio-archive",
+            "com.apple.xar-archive",
+            "com.apple.installer-package-archive",
+            SupportedFormats.ImportedUTI.unixAr,
+            SupportedFormats.ImportedUTI.msi,
+            "public.iso-image",
+            "org.archive.warc-archive",
+            "com.microsoft.windows-executable",
+        ]
+        for uti in required {
+            #expect(utis.contains(uti), "SupportedFormats.formats is missing \(uti)")
+        }
+        #expect(SupportedFormats.formats.count == 22)
         for fmt in SupportedFormats.formats {
             #expect(!fmt.extensions.isEmpty, "format \(fmt.utiIdentifier) must list at least one extension")
         }

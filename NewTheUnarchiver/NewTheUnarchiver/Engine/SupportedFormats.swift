@@ -1,15 +1,14 @@
 import Foundation
 import UniformTypeIdentifiers
 
-/// Single source of truth for which archive formats v1 advertises to the
+/// Single source of truth for which archive formats the app advertises to the
 /// system. Used by `File ▸ Open…`'s filter, the `Info.plist`
 /// `CFBundleDocumentTypes` declaration, and the Archive Formats Preferences
 /// tab — so the three never drift.
 ///
-/// The engine opens more formats than this list; we restrict the OS-level
-/// advertisement to the "popular" set from `docs/Supported formats.md`. Less
-/// noise in Finder's "Open With" menu, fewer accidental opens of files the
-/// engine cannot extract cleanly.
+/// Matches the engine's Phase 5 format set (see `docs/phase5-formats-priority.md`).
+/// Formats without a stable system UTI (`ar`, `msi`) use app-declared imported
+/// types in `Info.plist` → `UTImportedTypeDeclarations`.
 enum SupportedFormats {
     /// Rich metadata per format. The UTI identifier feeds Launch Services
     /// (`LSCopyDefaultRoleHandlerForContentType`); `extensions` lists trailing
@@ -27,6 +26,12 @@ enum SupportedFormats {
         var displayNameKey: String { "format.\(extensions[0]).name" }
     }
 
+    /// Custom UTIs declared in `Info.plist` → `UTImportedTypeDeclarations`.
+    enum ImportedUTI {
+        static let unixAr = "aleksei.trankov.newtheunarchiver.unix-ar-archive"
+        static let msi = "aleksei.trankov.newtheunarchiver.msi-installer"
+    }
+
     /// Order here is the order shown in the Preferences tab.
     static let formats: [Format] = [
         Format(utiIdentifier: "public.zip-archive", extensions: ["zip"]),
@@ -36,6 +41,21 @@ enum SupportedFormats {
         Format(utiIdentifier: "org.gnu.gnu-zip-archive", extensions: ["gz", "tar.gz"]),
         Format(utiIdentifier: "public.bzip2-archive", extensions: ["bz2", "tar.bz2"]),
         Format(utiIdentifier: "org.tukaani.xz-archive", extensions: ["xz", "tar.xz"]),
+        Format(utiIdentifier: "com.facebook.zstandard-archive", extensions: ["zst", "tar.zst"]),
+        Format(utiIdentifier: "org.tukaani.lzma-archive", extensions: ["lzma", "tar.lzma"]),
+        Format(utiIdentifier: "public.z-archive", extensions: ["z", "tar.z"]),
+        Format(utiIdentifier: "com.winzip.zipx-archive", extensions: ["zipx"]),
+        Format(utiIdentifier: "com.microsoft.cab", extensions: ["cab"]),
+        Format(utiIdentifier: "org.debian.deb-archive", extensions: ["deb", "udeb"]),
+        Format(utiIdentifier: "com.redhat.rpm-archive", extensions: ["rpm"]),
+        Format(utiIdentifier: "public.cpio-archive", extensions: ["cpio"]),
+        Format(utiIdentifier: "com.apple.xar-archive", extensions: ["xar"]),
+        Format(utiIdentifier: "com.apple.installer-package-archive", extensions: ["pkg"]),
+        Format(utiIdentifier: ImportedUTI.unixAr, extensions: ["ar"]),
+        Format(utiIdentifier: ImportedUTI.msi, extensions: ["msi"]),
+        Format(utiIdentifier: "public.iso-image", extensions: ["iso"]),
+        Format(utiIdentifier: "org.archive.warc-archive", extensions: ["warc"]),
+        Format(utiIdentifier: "com.microsoft.windows-executable", extensions: ["exe"]),
     ]
 
     /// Flat list of trailing extensions for `Info.plist` sync. Materialized

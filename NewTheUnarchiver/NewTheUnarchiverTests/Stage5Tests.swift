@@ -9,24 +9,52 @@ struct Stage5Tests {
 
     // MARK: - SupportedFormats canonical set
 
-    @Test("SupportedFormats declares the v1 popular-archive extension set")
-    func supportedFormats_v1Extensions() {
+    @Test("SupportedFormats declares the Phase 5 archive extension set")
+    func supportedFormats_phase5Extensions() {
         let exts = SupportedFormats.fileExtensions
-        let required = ["zip", "7z", "rar", "tar", "gz", "bz2", "xz", "tar.gz", "tar.bz2", "tar.xz"]
+        let required = [
+            "zip", "7z", "rar", "tar", "gz", "bz2", "xz",
+            "tar.gz", "tar.bz2", "tar.xz",
+            "zst", "tar.zst", "lzma", "tar.lzma", "z", "tar.z",
+            "zipx", "cab", "deb", "udeb", "rpm", "cpio", "xar", "pkg",
+            "ar", "msi", "iso", "warc", "exe",
+        ]
         for ext in required {
             #expect(exts.contains(ext), "SupportedFormats.fileExtensions is missing \(ext)")
         }
+        #expect(SupportedFormats.formats.count == 22)
     }
 
-    @Test("SupportedFormats.utTypes covers the common archive UTIs by identifier")
+    @Test("SupportedFormats.utTypes covers the Phase 5 archive UTIs by identifier")
     func supportedFormats_utTypesCoverArchiveUTIs() {
         let identifiers = Set(SupportedFormats.utTypes.map(\.identifier))
-        #expect(identifiers.contains("public.zip-archive"))
-        #expect(identifiers.contains("org.7-zip.7-zip-archive"))
-        #expect(identifiers.contains("com.rarlab.rar-archive"))
-        #expect(identifiers.contains("public.tar-archive"))
-        #expect(identifiers.contains("org.gnu.gnu-zip-archive"))
-        #expect(identifiers.contains("public.bzip2-archive"))
+        let required = [
+            "public.zip-archive",
+            "org.7-zip.7-zip-archive",
+            "com.rarlab.rar-archive",
+            "public.tar-archive",
+            "org.gnu.gnu-zip-archive",
+            "public.bzip2-archive",
+            "org.tukaani.xz-archive",
+            "com.facebook.zstandard-archive",
+            "org.tukaani.lzma-archive",
+            "public.z-archive",
+            "com.winzip.zipx-archive",
+            "com.microsoft.cab",
+            "org.debian.deb-archive",
+            "com.redhat.rpm-archive",
+            "public.cpio-archive",
+            "com.apple.xar-archive",
+            "com.apple.installer-package-archive",
+            SupportedFormats.ImportedUTI.unixAr,
+            SupportedFormats.ImportedUTI.msi,
+            "public.iso-image",
+            "org.archive.warc-archive",
+            "com.microsoft.windows-executable",
+        ]
+        for uti in required {
+            #expect(identifiers.contains(uti), "SupportedFormats.utTypes is missing \(uti)")
+        }
     }
 
     @Test("Every single-component file extension resolves to a real UTType")

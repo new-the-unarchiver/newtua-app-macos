@@ -17,6 +17,21 @@
 				<string>org.gnu.gnu-zip-archive</string>
 				<string>public.bzip2-archive</string>
 				<string>org.tukaani.xz-archive</string>
+				<string>com.facebook.zstandard-archive</string>
+				<string>org.tukaani.lzma-archive</string>
+				<string>public.z-archive</string>
+				<string>com.winzip.zipx-archive</string>
+				<string>com.microsoft.cab</string>
+				<string>org.debian.deb-archive</string>
+				<string>com.redhat.rpm-archive</string>
+				<string>public.cpio-archive</string>
+				<string>com.apple.xar-archive</string>
+				<string>com.apple.installer-package-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.unix-ar-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.msi-installer</string>
+				<string>public.iso-image</string>
+				<string>org.archive.warc-archive</string>
+				<string>com.microsoft.windows-executable</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>
