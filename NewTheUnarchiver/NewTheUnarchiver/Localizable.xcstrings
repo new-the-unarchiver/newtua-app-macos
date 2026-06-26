@@ -154,6 +154,23 @@
         }
       }
     },
+    "format.lz4.name" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "LZ4 archive"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Архив LZ4"
+          }
+        }
+      }
+    },
     "format.lzma.name" : {
       "extractionState" : "manual",
       "localizations" : {

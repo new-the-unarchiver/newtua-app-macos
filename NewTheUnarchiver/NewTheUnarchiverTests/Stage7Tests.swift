@@ -22,6 +22,7 @@ struct Stage7Tests {
             "com.facebook.zstandard-archive",
             "org.tukaani.lzma-archive",
             "public.z-archive",
+            "public.lz4-archive",
             "com.winzip.zipx-archive",
             "com.microsoft.cab",
             "org.debian.deb-archive",
@@ -38,7 +39,7 @@ struct Stage7Tests {
         for uti in required {
             #expect(utis.contains(uti), "SupportedFormats.formats is missing \(uti)")
         }
-        #expect(SupportedFormats.formats.count == 22)
+        #expect(SupportedFormats.formats.count == 23)
         for fmt in SupportedFormats.formats {
             #expect(!fmt.extensions.isEmpty, "format \(fmt.utiIdentifier) must list at least one extension")
         }

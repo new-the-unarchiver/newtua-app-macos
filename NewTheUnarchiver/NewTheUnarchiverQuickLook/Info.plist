@@ -20,6 +20,7 @@
 				<string>com.facebook.zstandard-archive</string>
 				<string>org.tukaani.lzma-archive</string>
 				<string>public.z-archive</string>
+				<string>public.lz4-archive</string>
 				<string>com.winzip.zipx-archive</string>
 				<string>com.microsoft.cab</string>
 				<string>org.debian.deb-archive</string>

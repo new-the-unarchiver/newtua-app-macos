@@ -44,6 +44,7 @@ enum SupportedFormats {
         Format(utiIdentifier: "com.facebook.zstandard-archive", extensions: ["zst", "tar.zst"]),
         Format(utiIdentifier: "org.tukaani.lzma-archive", extensions: ["lzma", "tar.lzma"]),
         Format(utiIdentifier: "public.z-archive", extensions: ["z", "tar.z"]),
+        Format(utiIdentifier: "public.lz4-archive", extensions: ["lz4", "tar.lz4"]),
         Format(utiIdentifier: "com.winzip.zipx-archive", extensions: ["zipx"]),
         Format(utiIdentifier: "com.microsoft.cab", extensions: ["cab"]),
         Format(utiIdentifier: "org.debian.deb-archive", extensions: ["deb", "udeb"]),

@@ -16,13 +16,14 @@ struct Stage5Tests {
             "zip", "7z", "rar", "tar", "gz", "bz2", "xz",
             "tar.gz", "tar.bz2", "tar.xz",
             "zst", "tar.zst", "lzma", "tar.lzma", "z", "tar.z",
+            "lz4", "tar.lz4",
             "zipx", "cab", "deb", "udeb", "rpm", "cpio", "xar", "pkg",
             "ar", "msi", "iso", "warc", "exe",
         ]
         for ext in required {
             #expect(exts.contains(ext), "SupportedFormats.fileExtensions is missing \(ext)")
         }
-        #expect(SupportedFormats.formats.count == 22)
+        #expect(SupportedFormats.formats.count == 23)
     }
 
     @Test("SupportedFormats.utTypes covers the Phase 5 archive UTIs by identifier")
@@ -39,6 +40,7 @@ struct Stage5Tests {
             "com.facebook.zstandard-archive",
             "org.tukaani.lzma-archive",
             "public.z-archive",
+            "public.lz4-archive",
             "com.winzip.zipx-archive",
             "com.microsoft.cab",
             "org.debian.deb-archive",

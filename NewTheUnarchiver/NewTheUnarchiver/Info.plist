@@ -126,6 +126,18 @@
 		</dict>
 		<dict>
 			<key>CFBundleTypeName</key>
+			<string>LZ4 Archive</string>
+			<key>CFBundleTypeRole</key>
+			<string>Viewer</string>
+			<key>LSHandlerRank</key>
+			<string>Default</string>
+			<key>LSItemContentTypes</key>
+			<array>
+				<string>public.lz4-archive</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeName</key>
 			<string>Zipx Archive</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
