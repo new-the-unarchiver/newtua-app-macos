@@ -1,216 +1,89 @@
-# NewTheUnarchiver — рабочий контекст macOS GUI
+# NewTheUnarchiver — бриф macOS GUI
 
-Этот файл — рабочие заметки для ассистента (Claude Code) при разработке
-именно macOS-приложения. Технический контракт с движком не дублируется
-здесь, см. ссылки ниже.
+Бриф для ассистента при работе над SwiftUI-приложением. Детали интеграции
+с движком и контракт ядра — в родительских `CLAUDE.md` (ниже); здесь только
+контекст приложения и то, чего там нет.
 
-## Статус проекта
+Xcode-проект: `NewTheUnarchiver.xcodeproj` в этой папке.
 
-**v1 готов** (2026-06-24). Все 10 этапов плана + 10.1 закрыты,
-финальная проверка пройдена (см. `decisions.md` «2026-06-24 — v1 готов»).
-Ветка `macapp`, готова к слиянию с `dev`.
+## Статус
 
-Сейчас — фаза post-v1: поддержка, мелкие правки, подготовка к v2.
-Большие изменения скоупа обсуждать с человеком до правок кода.
+**v1 готов** (2026-06-24, см. `decisions.md`). Фаза post-v1: поддержка,
+мелкие правки, v2. Крупный скоуп — согласовать с человеком до кода.
 
 ## Связанные документы
 
-- **Технический бриф по интеграции с движком:** `../CLAUDE.md`
-  (`apps/macos/CLAUDE.md`). Первоисточник по линковке движка,
-  ABI, ограничениям памяти, потокобезопасности `Archive`, поведению флагов
-  `wrapper`/`strict`/`preserve`, формату прогресса и т.д.
-- **Контракт на форматы и поведение ядра:** `../../../CLAUDE.md` (корень репо).
-- **Журнал принятых решений:** `decisions.md` в этой же папке. **Все**
-  промежуточные договорённости между человеком и ассистентом фиксируем туда
-  с датой. Перед началом любой задачи — сверяться с журналом, чтобы не
-  переспрашивать уже решённое.
-- **План разработки:** `plan.md` в этой же папке — исторический документ
-  хода работы по этапам 0–10.1. Для актуального состояния сверяться с
-  `decisions.md`, не с `plan.md`.
-- **Карта кода:** `ARCHITECTURE.md` в этой же папке — как устроен код
-  сейчас: слои (Domain / Engine / Views / Settings / QuickLook), что
-  делает каждый файл, граф взаимодействий, модель конкурентности,
-  известные ограничения v1. Отвечает на вопрос «как устроено», в отличие
-  от `decisions.md` («почему») и `plan.md` («что делали по этапам»).
-- **Скилл «добавление формата»:** `apps/macos/.claude/skills/add-macos-format/`
-  — полный цикл переноса нового формата из ядра в приложение (дельта
-  ядро↔GUI → выбор UTI → правки Info.plist/Quick Look/локализации/тестов →
-  гейт → сборка и установка через `tools/install-prealpha.sh` → запись в
-  `decisions.md` → коммит). Вызывается, когда в ядре появился формат, не
-  объявленный в GUI.
-- **Установка пре-альфы:** `apps/macos/tools/install-prealpha.sh` —
-  Release-сборка + копия в `/Applications` + регистрация Launch Services и
-  Quick Look + самопроверка. Канонический способ выкатить тестовый релиз.
+| Файл | Зачем |
+|------|--------|
+| [`../CLAUDE.md`](../CLAUDE.md) | Линковка XCFramework, Swift API `Newtua`, concurrency, пароль, флаги `wrapper`/`strict`/`preserve`, расширение ABI. |
+| [`../../../CLAUDE.md`](../../../CLAUDE.md) | Rust-движок: форматы, детект, extract, gotchas (`unrar`, in-process). |
+| `decisions.md` | Журнал решений. **Перед задачей — свериться.** Новое — сюда с датой ISO. |
+| `ARCHITECTURE.md` | Как устроен код (Domain / Engine / Views / Settings / QuickLook). |
+| `plan.md` | История этапов 0–10.1; актуальность — в `decisions.md`. |
+| `../.claude/skills/add-macos-format/` | Новый формат из ядра → UTI, Info.plist, QL, локализация, тесты, `install-prealpha.sh`. |
+| `../tools/install-prealpha.sh` | Release в `/Applications` + Launch Services + Quick Look. |
 
-## Стек и цели
+## Стек
 
-- SwiftUI, цель — macOS 26+ (поддержка Liquid Glass и новых API).
-- Конкуренция: только `async`/`await` и `@Observable`. Combine не использовать.
-- Без SwiftData. (Шаблонный `Item.swift` и `ModelContainer` удалены на
-  этапе 0.)
-- Вся логика архивов — в `Newtua` (Swift Package) и `newtua-core` (Rust).
-  В Swift не парсим байты архивов, не считаем пути извлечения,
-  не делаем path-safety. Если кажется, что приходится — это сигнал, что
-  фича должна попасть в C-ABI или Swift-обёртку.
+- SwiftUI, **macOS 26+**. Только `async`/`await` и `@Observable`; Combine не использовать.
+- Логика архивов — в `Newtua` / `newtua-core` (см. [`../CLAUDE.md`](../CLAUDE.md)). В Swift — UI и оркестрация.
 
-## Линковка движка через XCFramework (Этап 10)
+## Специфика приложения (не в родительских CLAUDE.md)
 
-С Этапа 10 движок линкуется через готовый артефакт, **а не** через
-`cargo build` на лету:
+- **macOS metadata в UI:** движок дропает `._*`, `.DS_Store`, `__MACOSX/`; toggle нет
+  (`decisions.md`). Подсчёт top-level — `Engine/MacOSSidecars.swift`, синхронно с движком.
+- **Sandbox:** security-scoped bookmarks на destination — открыть scope **до** `extract`.
+- **Папка-обёртка «Always»:** логика в Swift поверх `wrapper` (см. `decisions.md`).
 
-- `Newtua.xcframework` собирается скриптом
-  `apps/macos/tools/build-newtua-xcframework.sh` (только
-  `aarch64-apple-darwin`, release-dylib, `install_name`
-  `@rpath/Newtua.framework/Versions/A/Newtua`).
-- XCFramework в git **не коммитим** — попадает в `.gitignore`.
-- В Xcode-проекте есть Run Script build phase, который дёргает этот
-  скрипт перед компиляцией. Скрипт сам делает early-exit по mtime —
-  при тёплом прогоне ~0.6 с, при холодном ~13 с.
-- В `bindings/swift/Package.swift` стоит `.binaryTarget` —
-  `swift test` **больше не вызывает cargo сам**. Перед `swift test`
-  нужно либо собрать XCFramework скриптом, либо собрать app в Xcode
-  (Run Script сделает это автоматически).
-- App-таргет — Newtua framework в **Embed & Sign**.
-- Quick Look extension таргет — Newtua framework в **Do Not Embed**
-  (использует встроенный в app родительский bundle через `@rpath`).
+## Запреты (macOS-агент)
 
-Что **категорически нельзя**:
-- Править `crates/`, `Cargo.toml`, `Cargo.lock` — зона Rust-агента
-  (см. memory `feedback_dont_edit_cargo_toml.md`). Любая правка движка
-  оформляется как `docs/handoff-*.md`.
-- Править `project.pbxproj` при открытом Xcode (см. memory
-  `feedback_no_pbxproj_edits.md`). Для правок Xcode-таргетов готовим
-  пошаговую инструкцию пользователю.
+- Править `crates/`, `Cargo.toml`, `Cargo.lock` — handoff Rust-агенту (`docs/handoff-*.md`).
+- Править `project.pbxproj` при открытом Xcode — пошаговая инструкция пользователю.
 
-## Стиль работы с человеком
+Остальные запреты (subprocess, `unrar`, потоки `Archive` и т.д.) — в [`../CLAUDE.md`](../CLAUDE.md).
 
-- **Сначала обсуждение, потом код.** Никаких неожиданных правок.
-- **Все промежуточные решения** (выбор API, изменения скоупа, отказ от
-  фичи, перенос на v2) фиксируем в `decisions.md` сразу же, с датой
-  ISO 8601 (YYYY-MM-DD).
-- Отвечаем по-русски, простыми словами; технические термины — без
-  калькированных оборотов.
-- Коммитим только когда человек явно просит. Файлы пишем сразу, коммит — нет.
-- Перед обращением к новым API SwiftUI / Apple SDK — проверять
-  `DocumentationSearch`, не полагаться на память.
+## Работа с человеком
 
-## Что уже зафиксировано как решение
+- Сначала обсуждение, потом код. Коммит — только по явной просьбе.
+- Ответы по-русски. Новые API SwiftUI/Apple — через `DocumentationSearch`.
+- Решения, скоуп, отказы — сразу в `decisions.md`.
 
-См. `decisions.md`. Здесь только указатель — содержимое журнала не дублируем.
+## Локализация (RU + EN)
 
-## План разработки
+От движка — только `NewtuaError.message`. Всё UI — **String Catalog**
+`Localizable.xcstrings`: ключи в RU и EN одновременно с кодом; SwiftUI —
+`Text("key")`, иначе `String(localized:)`. Без хардкода. Plural — variations.
 
-См. `plan.md` в этой же папке. Этапы 0–10 + 10.1, все закрыты на
-2026-06-24. План — исторический документ; новые работы фиксируем в
-`decisions.md`, а не дописываем в `plan.md`.
+## Тесты
 
-## Сквозные требования (применяются на всех этапах плана)
+TDD: тесты первыми → минимальный код → зелёные → расширенный набор (unit/integration/end-to-end/edge) → ревью → зелёные.
 
-### Локализация интерфейса (RU + EN — обязательны к релизу)
+- Unit/integration: **Swift Testing** (`@Test`, `#expect`).
+- UI: **XCUIAutomation** (`NewTheUnarchiverUITests`).
+- Обёртка `Newtua`: `swift test` в `bindings/swift/` (сначала XCFramework — см. [`../CLAUDE.md`](../CLAUDE.md)).
+- Сборка: MCP `BuildProject`; диагностика: `XcodeRefreshCodeIssuesInFile`.
 
-**Что берётся от движка:** только `ntua_error_message(status, lang)`
-— динамические сообщения по коду статуса (EN/RU уже встроены в
-`newtua-core`). Передаём `Locale.current.identifier`.
-
-**Всё остальное локализуем в приложении сами:** заголовки окон, меню,
-кнопки, тултипы, плейсхолдеры, подписи в очереди, inline-блоки
-пароля/кодировки, Preferences, уведомления, тексты Quick Look-ошибок
-не от движка.
-
-**Технические правила:**
-- Все пользовательские строки — в **String Catalog**
-  (`Localizable.xcstrings`). Никаких хардкод-строк в `Text(...)` /
-  алертах / уведомлениях / заголовках окон / меню.
-- В SwiftUI — `Text("key")` (автолокализация через каталог). В не-View
-  контекстах — `String(localized: "key", bundle: .main)`.
-- Множественные числа — через variations в `Localizable.xcstrings`.
-- Строки на обеих локалях (RU и EN) создаёт ассистент сам в момент
-  добавления ключа. Человек переводы не пишет.
-
-**На каждом этапе плана:** новые ключи попадают в каталог в обоих
-локалях одновременно с TDD-тестами. В критерий завершения этапа
-входит «новые строки переведены на RU и EN, TODO-маркеров нет».
-
-**Перед релизом:** сборка с `-NSShowNonLocalizedStrings YES`,
-ручная проверка обеих локалей по сценариям этапов 4–9.
-
-## Методология (применяется на КАЖДОМ этапе плана)
-
-Жёсткое правило: **не переходить к следующему этапу, пока не выполнены
-все 10 подшагов текущего**.
-
-1. **Задача.** Однозначно сформулирована цель этапа и критерий завершения.
-2. **TDD-тесты пишем первыми.** Минимальный набор тестов, описывающих
-   ожидаемое поведение. Запускаем — должны быть **красными** (проверка,
-   что они вообще что-то проверяют). До написания кода — учитываем все
-   возможные проблемы из секции «Риски и краевые случаи» этапа.
-3. **Минимальная реализация.** Ровно столько кода, сколько нужно, чтобы
-   зелёные были все TDD-тесты. Без забегов вперёд.
-4. **Прогон TDD-тестов до зелёного.** Не двигаемся дальше, пока все
-   TDD-тесты зелёные.
-5. **Расширенный тестовый набор** — unit / integration / end-to-end /
-   edge: дописываем всё, что не вошло в TDD-минимум — ошибочные пути,
-   краевые случаи, взаимодействия компонентов, UI через XCUIAutomation.
-6. **Прогон полного набора до зелёного.** Правим код до полной зелени
-   всех тестов.
-7. **Краткий код-ревью.** Поиск дублей, мёртвого кода, потенциальных
-   уязвимостей, явных ошибок, переусложнений, неэффективностей.
-   Составляем список найденных проблем.
-8. **Анализ списка проблем.** Отсеиваем ложные срабатывания,
-   несущественное, обусловленное спецификой задачи или особенностями
-   проекта.
-9. **Исправление подтверждённых проблем.**
-10. **Повторный прогон полного набора до зелёного.** Правим код до
-    полной зелени всех тестов. Только после этого — переход к следующему
-    этапу.
-
-**Инструменты тестирования:**
-- Unit / integration: **Swift Testing** (`@Test`, `#expect`, `#require`).
-- UI: **XCUIAutomation** в таргете `NewTheUnarchiverUITests`.
-- Тесты Swift-обёртки: `swift test` в `bindings/swift/` (требует
-  `cargo build -p newtua-ffi` перед запуском).
-- Сборка Xcode-проекта: MCP-команда `BuildProject`.
-- Быстрые диагностики компилятора: `XcodeRefreshCodeIssuesInFile`.
-
-### Тайм-ауты для тестов — ОБЯЗАТЕЛЬНО
-
-**Каждый** прогон `xcodebuild test` идёт с тайм-аутами и серийно.
-Без этого зависший тест греет CPU и блокирует машину человека:
+**Каждый** `xcodebuild test` — **тайм-ауты**, серийно, killall до и после:
 
 ```bash
 killall -9 NewTheUnarchiver xcodebuild xctest 2>/dev/null; sleep 1
 perl -e 'alarm 240; exec @ARGV' xcodebuild test \
-  -project NewTheUnarchiver.xcodeproj \
-  -scheme NewTheUnarchiver \
+  -project NewTheUnarchiver.xcodeproj -scheme NewTheUnarchiver \
   -destination 'platform=macOS' \
   -only-testing:NewTheUnarchiverTests/<suite> \
   -test-timeouts-enabled YES \
   -default-test-execution-time-allowance 30 \
   -maximum-test-execution-time-allowance 60 \
   -parallel-testing-enabled NO \
-  -resultBundlePath /tmp/xcresult-<name> \
-  -quiet 2>&1 | tail -3
+  -resultBundlePath /tmp/xcresult-<name> -quiet 2>&1 | tail -3
 xcrun xcresulttool get test-results summary --path /tmp/xcresult-<name> \
   2>&1 | grep -E '"(passedTests|failedTests|result)"' | head -3
 killall -9 NewTheUnarchiver xcodebuild xctest 2>/dev/null
 ```
 
-Что обязательно:
-- `-test-timeouts-enabled YES` — без этого следующие два флага не работают.
-- `-default-test-execution-time-allowance 30` — потолок на один тест в
-  секундах. Любой тест дольше 30 сек = test-runner его прибьёт и
-  пометит failed; остальные продолжатся.
-- `-maximum-test-execution-time-allowance 60` — жёсткий cap. Тест не
-  может потребовать больше через `@Test(timeoutLimit:)`.
-- `-parallel-testing-enabled NO` — MainActor-suite-ы под параллельной
-  раскладкой упирались в неявные deadlock'и. Серийно стабильнее.
-- `killall -9 NewTheUnarchiver xcodebuild xctest` **до и после** —
-  гарантия отсутствия орфан-процессов от предыдущих запусков (включая
-  ручные `open`).
-- `perl -e 'alarm 240; exec @ARGV'` — внешний пояс безопасности на весь
-  процесс xcodebuild (на случай, если он сам зависнет на «Test exceeded
-  …» репорте). Значение чуть больше суммарного бюджета сюиты.
+`-parallel-testing-enabled NO` — стабильнее с MainActor. Внешний пояс — `perl alarm`.
 
-Эти флаги работают **без правок `.xcscheme` / создания `.xctestplan`** —
-xcodebuild уважает их напрямую. На текущем macOS `timeout`/`gtimeout`
-не установлены, поэтому используем `perl -e 'alarm N; exec @ARGV'`.
+## Code Index
+
+CLI-индексатор вместо grep/find (`--path` = корень репо): `query`, `search-function`,
+`get-callers`, `get-file-summary`, `stats` — все с `--json`. Read-only БД, параллельно с MCP.

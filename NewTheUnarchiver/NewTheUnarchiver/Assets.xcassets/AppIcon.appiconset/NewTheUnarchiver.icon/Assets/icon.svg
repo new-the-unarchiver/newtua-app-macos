@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<defs>
+ <clipPath id="sq"><path d="M1024.00 512.00 L1023.84 652.23 L1023.37 696.98 L1022.58 729.44 L1021.47 755.78 L1020.04 778.30 L1018.29 798.12 L1016.22 815.91 L1013.83 832.08 L1011.10 846.93 L1008.04 860.66 L1004.64 873.42 L1000.90 885.33 L996.81 896.47 L992.37 906.92 L987.56 916.73 L982.38 925.96 L976.82 934.64 L970.87 942.81 L964.51 950.50 L957.72 957.72 L950.50 964.51 L942.81 970.87 L934.64 976.82 L925.96 982.38 L916.73 987.56 L906.92 992.37 L896.47 996.81 L885.33 1000.90 L873.42 1004.64 L860.66 1008.04 L846.93 1011.10 L832.08 1013.83 L815.91 1016.22 L798.12 1018.29 L778.30 1020.04 L755.78 1021.47 L729.44 1022.58 L696.98 1023.37 L652.23 1023.84 L512.00 1024.00 L371.77 1023.84 L327.02 1023.37 L294.56 1022.58 L268.22 1021.47 L245.70 1020.04 L225.88 1018.29 L208.09 1016.22 L191.92 1013.83 L177.07 1011.10 L163.34 1008.04 L150.58 1004.64 L138.67 1000.90 L127.53 996.81 L117.08 992.37 L107.27 987.56 L98.04 982.38 L89.36 976.82 L81.19 970.87 L73.50 964.51 L66.28 957.72 L59.49 950.50 L53.13 942.81 L47.18 934.64 L41.62 925.96 L36.44 916.73 L31.63 906.92 L27.19 896.47 L23.10 885.33 L19.36 873.42 L15.96 860.66 L12.90 846.93 L10.17 832.08 L7.78 815.91 L5.71 798.12 L3.96 778.30 L2.53 755.78 L1.42 729.44 L0.63 696.98 L0.16 652.23 L0.00 512.00 L0.16 371.77 L0.63 327.02 L1.42 294.56 L2.53 268.22 L3.96 245.70 L5.71 225.88 L7.78 208.09 L10.17 191.92 L12.90 177.07 L15.96 163.34 L19.36 150.58 L23.10 138.67 L27.19 127.53 L31.63 117.08 L36.44 107.27 L41.62 98.04 L47.18 89.36 L53.13 81.19 L59.49 73.50 L66.28 66.28 L73.50 59.49 L81.19 53.13 L89.36 47.18 L98.04 41.62 L107.27 36.44 L117.08 31.63 L127.53 27.19 L138.67 23.10 L150.58 19.36 L163.34 15.96 L177.07 12.90 L191.92 10.17 L208.09 7.78 L225.88 5.71 L245.70 3.96 L268.22 2.53 L294.56 1.42 L327.02 0.63 L371.77 0.16 L512.00 0.00 L652.23 0.16 L696.98 0.63 L729.44 1.42 L755.78 2.53 L778.30 3.96 L798.12 5.71 L815.91 7.78 L832.08 10.17 L846.93 12.90 L860.66 15.96 L873.42 19.36 L885.33 23.10 L896.47 27.19 L906.92 31.63 L916.73 36.44 L925.96 41.62 L934.64 47.18 L942.81 53.13 L950.50 59.49 L957.72 66.28 L964.51 73.50 L970.87 81.19 L976.82 89.36 L982.38 98.04 L987.56 107.27 L992.37 117.08 L996.81 127.53 L1000.90 138.67 L1004.64 150.58 L1008.04 163.34 L1011.10 177.07 L1013.83 191.92 L1016.22 208.09 L1018.29 225.88 L1020.04 245.70 L1021.47 268.22 L1022.58 294.56 L1023.37 327.02 L1023.84 371.77 L1024.00 512.00 Z"></path></clipPath>
+ <linearGradient id="bg" gradientTransform="rotate(70 .5 .5)"><stop offset="0" stop-color="#2B2F37"></stop><stop offset="1" stop-color="#0F1115"></stop></linearGradient>
+ <linearGradient id="s3" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#223432"></stop><stop offset="1" stop-color="#121A19"></stop></linearGradient>
+ <linearGradient id="s2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#283E3B"></stop><stop offset="1" stop-color="#141E1C"></stop></linearGradient>
+ <linearGradient id="s1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2E4844"></stop><stop offset="1" stop-color="#162220"></stop></linearGradient>
+ <linearGradient id="slot" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#08201E"></stop><stop offset="1" stop-color="#123430"></stop></linearGradient>
+ <linearGradient id="drw" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#B5732A"></stop><stop offset="1" stop-color="#794916"></stop></linearGradient>
+ <linearGradient id="hdl" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5C3A14"></stop><stop offset="1" stop-color="#3A240A"></stop></linearGradient>
+ <radialGradient id="vig" cx=".5" cy=".48" r=".62"><stop offset="0" stop-color="#000" stop-opacity="0"></stop><stop offset="1" stop-color="#000" stop-opacity=".5"></stop></radialGradient>
+ <radialGradient id="shn" cx=".5" cy="-.14" r=".6"><stop offset="0" stop-color="#fff" stop-opacity=".17"></stop><stop offset=".9" stop-color="#fff" stop-opacity="0"></stop></radialGradient>
+ <radialGradient id="mint" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#54E6A8" stop-opacity="1"></stop><stop offset=".7" stop-color="#54E6A8" stop-opacity="0"></stop></radialGradient>
+ <radialGradient id="spark" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#B4FFE4" stop-opacity="1"></stop><stop offset=".7" stop-color="#54E6A8" stop-opacity="0"></stop></radialGradient>
+ <filter id="gA" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="0" stdDeviation="14" flood-color="#54E6A8" flood-opacity=".9"></feDropShadow></filter>
+ <filter id="gS" x="-60%" y="-60%" width="220%" height="220%"><feDropShadow dx="0" dy="0" stdDeviation="15" flood-color="#54E6A8" flood-opacity=".42"></feDropShadow></filter>
+ <filter id="b4" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+</defs>
+<g clip-path="url(#sq)">
+ <rect width="1024" height="1024" fill="url(#bg)"></rect>
+ <rect width="1024" height="1024" fill="url(#vig)"></rect>
+ <rect width="1024" height="1024" fill="url(#shn)"></rect>
+ <ellipse cx="512" cy="400" rx="362" ry="280" fill="url(#mint)" opacity=".22" style="mix-blend-mode:screen"></ellipse>
+ <ellipse cx="512" cy="570" rx="212" ry="160" fill="url(#mint)" opacity=".32" style="mix-blend-mode:screen"></ellipse>
+ <g filter="url(#gS)">
+  <rect x="433" y="520" width="158" height="62" rx="16" fill="url(#s3)"></rect><rect x="441" y="520" width="142" height="5" rx="2.5" fill="#54E6A8" opacity=".6"></rect>
+  <rect x="433" y="452" width="158" height="62" rx="16" fill="url(#s2)"></rect><rect x="441" y="452" width="142" height="5" rx="2.5" fill="#54E6A8" opacity=".82"></rect>
+  <rect x="433" y="384" width="158" height="62" rx="16" fill="url(#s1)"></rect><rect x="441" y="384" width="142" height="5" rx="2.5" fill="#54E6A8"></rect>
+ </g>
+ <path d="M512 196 L700 414 L512 384 L324 414 Z" fill="#54E6A8" filter="url(#gA)"></path>
+ <path d="M512 240 L628 392 L512 374 L396 392 Z" fill="#BEFFE8" opacity=".5"></path>
+ <rect x="320" y="600" width="384" height="46" rx="14" fill="url(#slot)"></rect>
+ <rect x="300" y="640" width="424" height="190" rx="26" fill="url(#drw)"></rect>
+ <rect x="306" y="645" width="412" height="7" rx="3.5" fill="#fff" opacity=".16"></rect>
+ <rect x="432" y="706" width="160" height="22" rx="11" fill="url(#hdl)"></rect>
+ <rect x="312" y="632" width="400" height="10" rx="5" fill="#54E6A8" opacity=".6" filter="url(#b4)"></rect>
+ <ellipse cx="512" cy="623" rx="164" ry="39" fill="url(#mint)" opacity=".85" style="mix-blend-mode:screen"></ellipse>
+ <ellipse cx="330" cy="330" rx="30" ry="30" fill="url(#spark)" opacity=".85" style="mix-blend-mode:screen"></ellipse>
+ <ellipse cx="703" cy="353" rx="23" ry="23" fill="url(#spark)" opacity=".8" style="mix-blend-mode:screen"></ellipse>
+ <ellipse cx="377" cy="247" rx="17" ry="17" fill="url(#spark)" opacity=".75" style="mix-blend-mode:screen"></ellipse>
+</g>
+</svg>

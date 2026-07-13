@@ -3,10 +3,12 @@
     "xcode-tools": {
       "type": "stdio",
       "command": "xcrun",
-      "args": [
-        "mcpbridge"
-      ],
+      "args": ["mcpbridge"],
       "env": {}
+    },
+    "code-index": {
+      "command": "npx",
+      "args": ["-y", "@regsorm/code-index-mcp", "serve", "--path", "."]
     }
   }
 }

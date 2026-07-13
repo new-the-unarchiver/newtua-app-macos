@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=NewTheUnarchiver
+GenericName=Archive Utility
+Comment=Extract and manage archives — the legendary unarchiver, reborn
+Exec=newtheunarchiver %f
+Icon=newtheunarchiver
+Terminal=false
+Categories=Utility;Archiving;Compression;
+MimeType=application/zip;application/x-7z-compressed;application/x-rar;application/x-tar;application/gzip;application/x-bzip2;application/x-xz;
