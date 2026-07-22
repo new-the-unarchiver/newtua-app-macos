@@ -1,0 +1,207 @@
+name: Release
+
+# Push a tag like v0.1.0 to cut a release. The tag is the single source of
+# truth for the version — it is passed to xcodebuild as MARKETING_VERSION, so
+# the project file never has to be touched to ship.
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build, without the leading v (e.g. 0.1.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.label }}
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            label: apple-silicon
+          - arch: x86_64
+            label: intel
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${TAG_NAME#v}"
+          fi
+          # Refuse anything that is not a plain dotted version: the value goes
+          # into build flags and file names.
+          if ! printf '%s' "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.]+)?$'; then
+            echo "::error::Refusing to build version '$VERSION' — expected something like 0.1.0"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Building version $VERSION"
+
+      # 26.5 is the runner default today; select it explicitly when present so
+      # a future default bump cannot silently change the toolchain, but do not
+      # hard-fail if the path differs — any SDK >= 26.5 builds this app.
+      - name: Select Xcode
+        run: |
+          if [ -d /Applications/Xcode_26.5.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.5.app
+          fi
+          xcodebuild -version
+          xcrun --show-sdk-version --sdk macosx
+
+      # No signing identity lives in CI, so the bundle is ad-hoc signed
+      # (CODE_SIGN_IDENTITY=-). That satisfies the Apple Silicon requirement
+      # that every binary carry a signature; it is not notarization, and the
+      # README tells users how to get past Gatekeeper on first launch.
+      - name: Build ${{ matrix.arch }}
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          xcodebuild build \
+            -project NewTheUnarchiver/NewTheUnarchiver.xcodeproj \
+            -scheme NewTheUnarchiver \
+            -configuration Release \
+            -destination "platform=macOS,arch=$ARCH" \
+            -derivedDataPath build \
+            MARKETING_VERSION="$VERSION" \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            -quiet
+
+      - name: Verify the bundle
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Release/NewTheUnarchiver.app
+          BIN="$APP/Contents/MacOS/NewTheUnarchiver"
+
+          # Built for the architecture we asked for, and only that one.
+          ACTUAL=$(lipo -archs "$BIN")
+          echo "architectures: $ACTUAL"
+          [ "$ACTUAL" = "$ARCH" ] || { echo "::error::expected $ARCH, got $ACTUAL"; exit 1; }
+
+          # The engine framework must be embedded, and must cover this arch.
+          FRAMEWORK="$APP/Contents/Frameworks/Newtua.framework/Versions/A/Newtua"
+          [ -f "$FRAMEWORK" ] || { echo "::error::Newtua.framework is not embedded"; exit 1; }
+          lipo -archs "$FRAMEWORK" | tr ' ' '\n' | grep -qx "$ARCH" \
+            || { echo "::error::Newtua.framework lacks $ARCH"; exit 1; }
+
+          # The Quick Look extension must ride along.
+          [ -d "$APP/Contents/PlugIns/NewTheUnarchiverQuickLook.appex" ] \
+            || { echo "::error::Quick Look extension is missing"; exit 1; }
+
+          # Ad-hoc signature must verify, or the app will not launch.
+          codesign --verify --deep --strict "$APP"
+
+          # The version we asked for is the version that shipped.
+          BUILT=$(plutil -extract CFBundleShortVersionString raw -o - "$APP/Contents/Info.plist")
+          echo "version in bundle: $BUILT"
+          [ "$BUILT" = "$VERSION" ] || { echo "::error::expected $VERSION, got $BUILT"; exit 1; }
+
+          # Every advertised type is declared; a mismatch means a broken build.
+          COUNT=$(plutil -extract CFBundleDocumentTypes raw -o - "$APP/Contents/Info.plist")
+          echo "document types: $COUNT"
+
+      - name: Package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          LABEL: ${{ matrix.label }}
+        run: |
+          set -euo pipefail
+          NAME="NewTheUnarchiver-$VERSION-$LABEL.zip"
+          # ditto keeps the bundle's symlinks, resource forks and signature
+          # intact; `zip` does not.
+          ditto -c -k --keepParent \
+            build/Build/Products/Release/NewTheUnarchiver.app "$NAME"
+          shasum -a 256 "$NAME" | tee "$NAME.sha256"
+          echo "name=$NAME" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NewTheUnarchiver-${{ matrix.label }}
+          path: |
+            ${{ steps.package.outputs.name }}
+            ${{ steps.package.outputs.name }}.sha256
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Resolve version
+        id: version
+        env:
+          TAG_NAME: ${{ github.ref_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          set -euo pipefail
+          if [ -n "${INPUT_VERSION:-}" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            VERSION="${TAG_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          ls -la dist
+          cat > notes.md <<'NOTES'
+          Two separate builds — pick the one that matches your Mac:
+
+          | Download | For |
+          | --- | --- |
+          | `…-apple-silicon.zip` | Apple Silicon (M1 and newer) |
+          | `…-intel.zip` | Intel Macs |
+
+          Not sure which you have? Apple menu ▸ About This Mac.
+
+          Requires macOS 26 or newer.
+
+          **First launch:** these builds are ad-hoc signed and not notarized, so
+          macOS refuses them the first time. Open System Settings ▸ Privacy &
+          Security, find the blocked app under Security and click *Open Anyway* —
+          or run `xattr -dr com.apple.quarantine /Applications/NewTheUnarchiver.app`
+          before opening it. See the README for details.
+
+          A `.sha256` file accompanies each archive.
+          NOTES
+          gh release create "v$VERSION" \
+            --repo "$REPO" \
+            --title "New The Unarchiver $VERSION" \
+            --notes-file notes.md \
+            dist/*.zip dist/*.sha256

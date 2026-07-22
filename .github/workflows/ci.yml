@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'screenshots/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    # macos-26 carries Xcode 26.5 with the macOS 26.5 SDK the app targets.
+    runs-on: macos-26
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 26.5 is the runner default today; select it explicitly when present so
+      # a future default bump cannot silently change the toolchain, but do not
+      # hard-fail if the path differs — any SDK >= 26.5 builds this app.
+      - name: Select Xcode
+        run: |
+          if [ -d /Applications/Xcode_26.5.app ]; then
+            sudo xcode-select -s /Applications/Xcode_26.5.app
+          fi
+          xcodebuild -version
+          xcrun --show-sdk-version --sdk macosx
+
+      - name: Build for testing
+        run: |
+          xcodebuild build-for-testing \
+            -project NewTheUnarchiver/NewTheUnarchiver.xcodeproj \
+            -scheme NewTheUnarchiver \
+            -configuration Debug \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            -quiet
+
+      # Unit tests only. The UI-test target is a placeholder (see
+      # NewTheUnarchiverUITests.swift) and its launch test needs a real
+      # window server session.
+      - name: Test
+        run: |
+          xcodebuild test-without-building \
+            -project NewTheUnarchiver/NewTheUnarchiver.xcodeproj \
+            -scheme NewTheUnarchiver \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath build \
+            -only-testing:NewTheUnarchiverTests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 30 \
+            -maximum-test-execution-time-allowance 60 \
+            -parallel-testing-enabled NO \
+            -resultBundlePath TestResults.xcresult \
+            -quiet
+
+      - name: Test summary
+        if: always()
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path TestResults.xcresult 2>/dev/null \
+            | grep -E '"(passedTests|failedTests|result)"' || true
+
+      - name: Upload test results on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+          retention-days: 7
