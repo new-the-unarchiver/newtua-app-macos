@@ -8,3 +8,11 @@ xcuserdata/
 *.xcodeproj/project.xcworkspace/xcuserdata/
 .swiftpm/
 Package.resolved
+.mcp.json
+CLAUDE.md
+handoff*.md
+NewTheUnarchiver-Icons/
+NewTheUnarchiver-DocIcon/
+.cursor/
+.claude/
+tools/
