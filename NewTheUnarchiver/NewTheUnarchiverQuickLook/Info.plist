@@ -33,6 +33,40 @@
 				<string>public.iso-image</string>
 				<string>org.archive.warc-archive</string>
 				<string>com.microsoft.windows-executable</string>
+				<string>aleksei.trankov.newtheunarchiver.brotli-archive</string>
+				<string>com.stuffit.archive.sit</string>
+				<string>com.stuffit.archive.sitx</string>
+				<string>com.apple.binhex-archive</string>
+				<string>com.apple.macbinary-archive</string>
+				<string>com.apple.applesingle-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.compactpro-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.packit-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.arj-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.zoo-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.lbr-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.arc-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.squeeze-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.alz-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.lzx-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.powerpacker-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.dms-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.squashfs-image</string>
+				<string>aleksei.trankov.newtheunarchiver.appimage-bundle</string>
+				<string>aleksei.trankov.newtheunarchiver.wim-image</string>
+				<string>aleksei.trankov.newtheunarchiver.hfsplus-image</string>
+				<string>com.apple.disk-image-udif</string>
+				<string>com.sun.java-archive</string>
+				<string>aleksei.trankov.newtheunarchiver.android-package</string>
+				<string>com.apple.itunes.ipa</string>
+				<string>aleksei.trankov.newtheunarchiver.chrome-extension</string>
+				<string>aleksei.trankov.newtheunarchiver.conda-package</string>
+				<string>org.idpf.epub-container</string>
+				<string>org.openxmlformats.wordprocessingml.document</string>
+				<string>org.openxmlformats.spreadsheetml.sheet</string>
+				<string>org.openxmlformats.presentationml.presentation</string>
+				<string>org.oasis-open.opendocument.text</string>
+				<string>org.oasis-open.opendocument.spreadsheet</string>
+				<string>org.oasis-open.opendocument.presentation</string>
 			</array>
 			<key>QLSupportsSearchableItems</key>
 			<false/>

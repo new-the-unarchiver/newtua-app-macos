@@ -16,14 +16,25 @@ struct Stage5Tests {
             "zip", "7z", "rar", "tar", "gz", "bz2", "xz",
             "tar.gz", "tar.bz2", "tar.xz",
             "zst", "tar.zst", "lzma", "tar.lzma", "z", "tar.z",
-            "lz4", "tar.lz4",
+            "lz4", "tar.lz4", "br", "tar.br",
             "zipx", "cab", "deb", "udeb", "rpm", "cpio", "xar", "pkg",
             "ar", "msi", "iso", "warc", "exe",
+            // Classic Mac — The Unarchiver's heritage.
+            "sit", "sitx", "hqx", "bin", "as", "cpt", "pit",
+            // Retro DOS / CP-M / Amiga.
+            "arj", "zoo", "lbr", "arc", "ark", "pak", "spark",
+            "sq", "qqq", "alz", "lzx", "pp", "dms",
+            // Filesystem and disk images.
+            "squashfs", "sfs", "appimage", "wim", "esd", "swm",
+            "hfs", "hfsplus", "hfsx", "dmg",
+            // Zip-based containers and documents.
+            "jar", "apk", "ipa", "crx", "conda",
+            "epub", "docx", "xlsx", "pptx", "odt", "ods", "odp",
         ]
         for ext in required {
             #expect(exts.contains(ext), "SupportedFormats.fileExtensions is missing \(ext)")
         }
-        #expect(SupportedFormats.formats.count == 23)
+        #expect(SupportedFormats.formats.count == 57)
     }
 
     @Test("SupportedFormats.utTypes covers the Phase 5 archive UTIs by identifier")

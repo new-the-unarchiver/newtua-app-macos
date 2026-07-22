@@ -35,14 +35,73 @@ struct Stage7Tests {
             "public.iso-image",
             "org.archive.warc-archive",
             "com.microsoft.windows-executable",
+            // Classic Mac heritage — all system types.
+            "com.stuffit.archive.sit",
+            "com.stuffit.archive.sitx",
+            "com.apple.binhex-archive",
+            "com.apple.macbinary-archive",
+            "com.apple.applesingle-archive",
+            SupportedFormats.ImportedUTI.compactpro,
+            SupportedFormats.ImportedUTI.packit,
+            // Retro archivers — app-declared throughout.
+            SupportedFormats.ImportedUTI.arj,
+            SupportedFormats.ImportedUTI.zoo,
+            SupportedFormats.ImportedUTI.lbr,
+            SupportedFormats.ImportedUTI.arc,
+            SupportedFormats.ImportedUTI.squeeze,
+            SupportedFormats.ImportedUTI.alz,
+            SupportedFormats.ImportedUTI.lzx,
+            SupportedFormats.ImportedUTI.powerpacker,
+            SupportedFormats.ImportedUTI.dms,
+            // Images, containers, documents.
+            SupportedFormats.ImportedUTI.brotli,
+            SupportedFormats.ImportedUTI.squashfs,
+            SupportedFormats.ImportedUTI.appimage,
+            SupportedFormats.ImportedUTI.wim,
+            SupportedFormats.ImportedUTI.hfsplus,
+            "com.apple.disk-image-udif",
+            "com.sun.java-archive",
+            SupportedFormats.ImportedUTI.android,
+            "com.apple.itunes.ipa",
+            SupportedFormats.ImportedUTI.chrome,
+            SupportedFormats.ImportedUTI.conda,
+            "org.idpf.epub-container",
+            "org.openxmlformats.wordprocessingml.document",
+            "org.oasis-open.opendocument.text",
         ]
         for uti in required {
             #expect(utis.contains(uti), "SupportedFormats.formats is missing \(uti)")
         }
-        #expect(SupportedFormats.formats.count == 23)
+        #expect(SupportedFormats.formats.count == 57)
         for fmt in SupportedFormats.formats {
             #expect(!fmt.extensions.isEmpty, "format \(fmt.utiIdentifier) must list at least one extension")
         }
+    }
+
+    @Test("Types owned by another app are advertised as Alternate, never Default")
+    func formats_documentsDoNotClaimDefault() {
+        // Word, Books and DiskImageMounter must keep their file types — we only
+        // want to show up under "Open With".
+        let mustBeAlternate: Set<String> = [
+            "com.apple.disk-image-udif",
+            "org.idpf.epub-container",
+            "org.openxmlformats.wordprocessingml.document",
+            "org.openxmlformats.spreadsheetml.sheet",
+            "org.openxmlformats.presentationml.presentation",
+            "org.oasis-open.opendocument.text",
+            "org.oasis-open.opendocument.spreadsheet",
+            "org.oasis-open.opendocument.presentation",
+            // Generic extensions we must not squat on.
+            "com.apple.macbinary-archive",
+            "com.apple.applesingle-archive",
+        ]
+        for fmt in SupportedFormats.formats where mustBeAlternate.contains(fmt.utiIdentifier) {
+            #expect(fmt.rank == .alternate, "\(fmt.utiIdentifier) must not claim the default handler role")
+        }
+        let alternates = Set(
+            SupportedFormats.formats.filter { $0.rank == .alternate }.map(\.utiIdentifier)
+        )
+        #expect(alternates == mustBeAlternate, "unexpected Alternate set: \(alternates)")
     }
 
     @Test("Derived fileExtensions stays consistent with the rich registry")
