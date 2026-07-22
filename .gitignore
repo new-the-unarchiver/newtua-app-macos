@@ -9,10 +9,16 @@ xcuserdata/
 .swiftpm/
 Package.resolved
 .mcp.json
+
+# Внутренние рабочие документы ассистента — наружу не публикуются
 CLAUDE.md
+ARCHITECTURE.md
+decisions.md
 handoff*.md
+docs/history/
 NewTheUnarchiver-Icons/
 NewTheUnarchiver-DocIcon/
 .cursor/
 .claude/
+.code-index/
 tools/
