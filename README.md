@@ -1,3 +1,5 @@
+**English** · [Русский](README_RU.md)
+
 # New The Unarchiver for macOS
 
 A small, quiet extractor for Mac. Drop an archive on it, get your files.
