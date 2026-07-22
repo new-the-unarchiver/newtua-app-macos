@@ -15,11 +15,10 @@ concurrency:
 jobs:
   build:
     name: Compile ${{ matrix.arch }}
-    # macos-26 carries the macOS 26.5 SDK this app targets. Note the runner
-    # itself boots macOS 26.4, which is why nothing here *runs* the app —
-    # see the "tests" note below.
+    # macos-26 boots macOS 26.4 and ships the 26.5 SDK. The app targets 26.0,
+    # so the runner can both build it and run its tests.
     runs-on: macos-26
-    timeout-minutes: 30
+    timeout-minutes: 40
 
     strategy:
       fail-fast: false
@@ -31,7 +30,7 @@ jobs:
 
       # 26.5 is the runner default today; select it explicitly when present so
       # a future default bump cannot silently change the toolchain, but do not
-      # hard-fail if the path differs — any SDK >= 26.5 builds this app.
+      # hard-fail if the path differs — any SDK >= 26.0 builds this app.
       - name: Select Xcode
         run: |
           if [ -d /Applications/Xcode_26.5.app ]; then
@@ -41,14 +40,6 @@ jobs:
           xcrun --show-sdk-version --sdk macosx
           sw_vers
 
-      # `build-for-testing` compiles the app *and* the test bundle, so a broken
-      # test still fails CI even though we cannot execute it here.
-      #
-      # Why tests do not run: the app's deployment target is macOS 26.5 and the
-      # runner boots 26.4, so xcodebuild refuses to launch the test host
-      # ("My Mac's macOS 26.4 doesn't match ... deployment target"). GitHub has
-      # no macOS 26.5 image. Until the runner image catches up — or the
-      # deployment target is lowered — the suite is run locally before release.
       - name: Compile app and tests (${{ matrix.arch }})
         env:
           ARCH: ${{ matrix.arch }}
@@ -65,18 +56,41 @@ jobs:
             DEVELOPMENT_TEAM= \
             -quiet
 
-      # The format registry drives four surfaces that can silently drift apart.
-      # FormatRegistrySyncTests guards them at test time; this is the part we
-      # can still check without running anything.
-      - name: Check the format registry reaches both Info.plist files
+      # Tests run on the runner's native architecture only. Executing the
+      # x86_64 bundle here would go through Rosetta and prove nothing the
+      # arm64 run does not; compiling it above is what catches Intel-only
+      # breakage.
+      #
+      # Serial, with timeouts: several suites drive @MainActor state and real
+      # extraction, and parallel execution makes them flaky (decisions.md).
+      - name: Test
+        if: matrix.arch == 'arm64'
         run: |
           set -euo pipefail
-          APP=build/Build/Products/Debug/NewTheUnarchiver.app
-          DOC=$(plutil -extract CFBundleDocumentTypes raw -o - "$APP/Contents/Info.plist")
-          QL=$(plutil -extract NSExtension.NSExtensionAttributes.QLSupportedContentTypes raw -o - \
-                 "$APP/Contents/PlugIns/NewTheUnarchiverQuickLook.appex/Contents/Info.plist")
-          SWIFT=$(grep -c 'Format(utiIdentifier' \
-                 NewTheUnarchiver/NewTheUnarchiver/Engine/SupportedFormats.swift)
-          echo "registry: $SWIFT · document types: $DOC · Quick Look: $QL"
-          [ "$DOC" = "$SWIFT" ] || { echo "::error::Info.plist declares $DOC types, registry has $SWIFT"; exit 1; }
-          [ "$QL" = "$SWIFT" ] || { echo "::error::Quick Look declares $QL types, registry has $SWIFT"; exit 1; }
+          xcodebuild test-without-building \
+            -project NewTheUnarchiver/NewTheUnarchiver.xcodeproj \
+            -scheme NewTheUnarchiver \
+            -destination 'platform=macOS,arch=arm64' \
+            -derivedDataPath build \
+            -only-testing:NewTheUnarchiverTests \
+            -test-timeouts-enabled YES \
+            -default-test-execution-time-allowance 30 \
+            -maximum-test-execution-time-allowance 60 \
+            -parallel-testing-enabled NO \
+            -resultBundlePath TestResults.xcresult \
+            -quiet
+
+      - name: Test summary
+        if: matrix.arch == 'arm64' && always()
+        run: |
+          xcrun xcresulttool get test-results summary \
+            --path TestResults.xcresult 2>/dev/null \
+            | grep -E '"(passedTests|failedTests|result)"' || true
+
+      - name: Upload test results on failure
+        if: matrix.arch == 'arm64' && failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults.xcresult
+          retention-days: 7
