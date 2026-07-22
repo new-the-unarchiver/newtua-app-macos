@@ -31,6 +31,10 @@ disk falls back to one job at a time, because parallel reads make those slower,
 not faster. Each row shows the file currently being written and a progress bar
 for the whole archive, and can be cancelled on its own.
 
+Four is a deliberate ceiling: speed here depends on I/O as much as on core count,
+and past four workers the disk sets the pace, so more of them buys nothing today.
+We will raise it when I/O gets faster.
+
 ### It shows you what is inside, before you extract
 
 Press Space on any supported archive and Quick Look renders the real contents —
