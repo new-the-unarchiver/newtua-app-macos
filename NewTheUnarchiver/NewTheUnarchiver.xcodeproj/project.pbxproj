@@ -240,7 +240,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 4E8DD5B22FE97BB5006C49C2 /* Build configuration list for PBXNativeTarget "NewTheUnarchiver" */;
 			buildPhases = (
-				4E8DD5BC2FE9835C006C49C2 /* Run Script */,
 				4E8DD58B2FE97BB4006C49C2 /* Sources */,
 				4E8DD58C2FE97BB4006C49C2 /* Frameworks */,
 				4E8DD58D2FE97BB4006C49C2 /* Resources */,
@@ -347,7 +346,7 @@
 			mainGroup = 4E8DD5862FE97BB4006C49C2;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
-				4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */,
+				4E8DD5BB2FE982F6006C49C2 /* XCRemoteSwiftPackageReference "newtua-swift" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 4E8DD5902FE97BB4006C49C2 /* Products */;
@@ -392,28 +391,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
-
-/* Begin PBXShellScriptBuildPhase section */
-		4E8DD5BC2FE9835C006C49C2 /* Run Script */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Run Script";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "set -euo pipefail\nexport PATH=\"$HOME/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:$PATH\"\nREPO_ROOT=\"$(git -C \"$SRCROOT\" rev-parse --show-toplevel)\"\n\"$REPO_ROOT/apps/macos/tools/build-newtua-xcframework.sh\"\n";
-		};
-/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4E4D15782FEB0CF2006D56D6 /* Sources */ = {
@@ -841,27 +818,31 @@
 		};
 /* End XCConfigurationList section */
 
-/* Begin XCLocalSwiftPackageReference section */
-		4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */ = {
-			isa = XCLocalSwiftPackageReference;
-			relativePath = ../../../bindings/swift;
+/* Begin XCRemoteSwiftPackageReference section */
+		4E8DD5BB2FE982F6006C49C2 /* XCRemoteSwiftPackageReference "newtua-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/new-the-unarchiver/newtua-swift";
+			requirement = {
+				kind = exactVersion;
+				version = 0.1.0;
+			};
 		};
-/* End XCLocalSwiftPackageReference section */
+/* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		4E4D15972FEBB0DA006D56D6 /* Newtua */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCRemoteSwiftPackageReference "newtua-swift" */;
 			productName = Newtua;
 		};
 		4E4D163C2FEC39C7006D56D6 /* Newtua */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCRemoteSwiftPackageReference "newtua-swift" */;
 			productName = Newtua;
 		};
 		4E8DD5BE2FE9852D006C49C2 /* Newtua */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 4E8DD5BB2FE982F6006C49C2 /* XCLocalSwiftPackageReference "../../../bindings/swift" */;
+			package = 4E8DD5BB2FE982F6006C49C2 /* XCRemoteSwiftPackageReference "newtua-swift" */;
 			productName = Newtua;
 		};
 /* End XCSwiftPackageProductDependency section */

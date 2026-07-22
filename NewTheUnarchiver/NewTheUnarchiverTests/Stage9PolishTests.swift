@@ -275,12 +275,12 @@ struct Stage9XcstringsSyncTests {
 
     @Test("preview.* keys match between main app's and extension's xcstrings")
     func previewKeysMatchBetweenCatalogs() throws {
-        let repo = TestSupport.repoRoot()
-        let mainURL = repo.appendingPathComponent(
-            "apps/macos/NewTheUnarchiver/NewTheUnarchiver/Localizable.xcstrings"
+        let project = TestSupport.projectDir()
+        let mainURL = project.appendingPathComponent(
+            "NewTheUnarchiver/Localizable.xcstrings"
         )
-        let extURL = repo.appendingPathComponent(
-            "apps/macos/NewTheUnarchiver/NewTheUnarchiverQuickLook/Localizable.xcstrings"
+        let extURL = project.appendingPathComponent(
+            "NewTheUnarchiverQuickLook/Localizable.xcstrings"
         )
         let mainCatalog = try Self.loadCatalog(at: mainURL)
         let extCatalog = try Self.loadCatalog(at: extURL)
