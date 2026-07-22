@@ -13,8 +13,8 @@ no feature creep and nothing running when you are not extracting.
 It **only extracts**. It never creates archives — there are good tools for
 that, and Finder already compresses to ZIP.
 
-> **Status: pre-alpha.** The app works end to end, but builds are not yet
-> notarized. See [Running an unsigned build](#running-an-unsigned-build).
+> **Status: beta.** The app is complete and in daily use; builds are not
+> notarized yet. See [Running an unsigned build](#running-an-unsigned-build).
 
 ## What it does better than its predecessor
 
@@ -100,7 +100,7 @@ Requires macOS 26 or newer.
 
 ### Running an unsigned build
 
-Pre-alpha builds are signed with a development certificate but **not notarized**,
+Beta builds are signed with a development certificate but **not notarized**,
 so Gatekeeper refuses them on first launch with a message about the app not being
 verified. This is expected. Two ways past it:
 
