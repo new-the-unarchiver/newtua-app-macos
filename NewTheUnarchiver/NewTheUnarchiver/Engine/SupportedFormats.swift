@@ -48,17 +48,40 @@ enum SupportedFormats {
     /// UTIs the app declares itself in `Info.plist` →
     /// `UTImportedTypeDeclarations`, because macOS ships no type for them.
     ///
-    /// Two kinds live here. Most are our own reverse-DNS types. Three —
-    /// `deb`, `rpm`, `warc` — keep the identifier the wider world already uses,
-    /// since those belong to Debian, Red Hat and the Internet Archive; macOS
-    /// simply doesn't ship them, so we declare what we know rather than mint a
-    /// competing name. (They looked resolvable for a long time only because a
-    /// stale Launch Services record supplied them; rebuilding the database
-    /// exposed that.)
+    /// Two kinds live here.
+    ///
+    /// **Established names we declare on their owners' behalf** — RAR,
+    /// Zstandard, WinZip, LZMA, LZ4, Debian, RPM, WARC. These identifiers are
+    /// what every other tool uses, so we keep them rather than mint competing
+    /// names; macOS just doesn't ship the types. Each of them *looked*
+    /// resolvable during development and was not: some came from other
+    /// installed apps (Keka, Chrome), one from a stale Launch Services record
+    /// pointing at a volume that no longer existed. A clean machine has none
+    /// of that — CI, which is exactly such a machine, is what caught them.
+    ///
+    /// **Our own reverse-DNS types** for formats with no established
+    /// identifier at all.
+    ///
+    /// Anything listed here must also appear in `Info.plist`;
+    /// `FormatRegistrySyncTests` fails if the two drift apart.
     enum ImportedUTI {
+        static let rar = "com.rarlab.rar-archive"
+        static let zstandard = "com.facebook.zstandard-archive"
+        static let zipx = "com.winzip.zipx-archive"
+        static let lzma = "org.tukaani.lzma-archive"
+        static let lz4 = "public.lz4-archive"
         static let deb = "org.debian.deb-archive"
         static let rpm = "com.redhat.rpm-archive"
         static let warc = "org.archive.warc-archive"
+
+        /// The eight above, as a set — `appDeclaredUTIs` needs them and a
+        /// literal list is easier to keep honest than string matching.
+        static let established: Set<String> = [
+            rar, zstandard, zipx, lzma, lz4, deb, rpm, warc,
+        ]
+
+        /// Prefix of every identifier we mint ourselves.
+        static let ownPrefix = "aleksei.trankov.newtheunarchiver."
 
         static let unixAr = "aleksei.trankov.newtheunarchiver.unix-ar-archive"
         static let msi = "aleksei.trankov.newtheunarchiver.msi-installer"
@@ -88,16 +111,16 @@ enum SupportedFormats {
         // Mainstream archives and packages.
         Format(utiIdentifier: "public.zip-archive", extensions: ["zip"]),
         Format(utiIdentifier: "org.7-zip.7-zip-archive", extensions: ["7z"]),
-        Format(utiIdentifier: "com.rarlab.rar-archive", extensions: ["rar"]),
+        Format(utiIdentifier: ImportedUTI.rar, extensions: ["rar"]),
         Format(utiIdentifier: "public.tar-archive", extensions: ["tar"]),
         Format(utiIdentifier: "org.gnu.gnu-zip-archive", extensions: ["gz", "tar.gz"]),
         Format(utiIdentifier: "public.bzip2-archive", extensions: ["bz2", "tar.bz2"]),
         Format(utiIdentifier: "org.tukaani.xz-archive", extensions: ["xz", "tar.xz"]),
-        Format(utiIdentifier: "com.facebook.zstandard-archive", extensions: ["zst", "tar.zst"]),
-        Format(utiIdentifier: "org.tukaani.lzma-archive", extensions: ["lzma", "tar.lzma"]),
+        Format(utiIdentifier: ImportedUTI.zstandard, extensions: ["zst", "tar.zst"]),
+        Format(utiIdentifier: ImportedUTI.lzma, extensions: ["lzma", "tar.lzma"]),
         Format(utiIdentifier: "public.z-archive", extensions: ["z", "tar.z"]),
-        Format(utiIdentifier: "public.lz4-archive", extensions: ["lz4", "tar.lz4"]),
-        Format(utiIdentifier: "com.winzip.zipx-archive", extensions: ["zipx"]),
+        Format(utiIdentifier: ImportedUTI.lz4, extensions: ["lz4", "tar.lz4"]),
+        Format(utiIdentifier: ImportedUTI.zipx, extensions: ["zipx"]),
         Format(utiIdentifier: "com.microsoft.cab", extensions: ["cab"]),
         Format(utiIdentifier: ImportedUTI.deb, extensions: ["deb", "udeb"]),
         Format(utiIdentifier: ImportedUTI.rpm, extensions: ["rpm"]),
@@ -163,8 +186,7 @@ enum SupportedFormats {
     /// Launch Services record) and silently stops working on a clean Mac.
     static let appDeclaredUTIs: Set<String> = Set(
         formats.map(\.utiIdentifier).filter {
-            $0.hasPrefix("aleksei.trankov.newtheunarchiver.")
-                || $0 == ImportedUTI.deb || $0 == ImportedUTI.rpm || $0 == ImportedUTI.warc
+            $0.hasPrefix(ImportedUTI.ownPrefix) || ImportedUTI.established.contains($0)
         }
     )
 
