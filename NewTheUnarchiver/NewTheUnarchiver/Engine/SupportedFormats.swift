@@ -45,8 +45,21 @@ enum SupportedFormats {
         var displayNameKey: String { "format.\(extensions[0]).name" }
     }
 
-    /// Custom UTIs declared in `Info.plist` → `UTImportedTypeDeclarations`.
+    /// UTIs the app declares itself in `Info.plist` →
+    /// `UTImportedTypeDeclarations`, because macOS ships no type for them.
+    ///
+    /// Two kinds live here. Most are our own reverse-DNS types. Three —
+    /// `deb`, `rpm`, `warc` — keep the identifier the wider world already uses,
+    /// since those belong to Debian, Red Hat and the Internet Archive; macOS
+    /// simply doesn't ship them, so we declare what we know rather than mint a
+    /// competing name. (They looked resolvable for a long time only because a
+    /// stale Launch Services record supplied them; rebuilding the database
+    /// exposed that.)
     enum ImportedUTI {
+        static let deb = "org.debian.deb-archive"
+        static let rpm = "com.redhat.rpm-archive"
+        static let warc = "org.archive.warc-archive"
+
         static let unixAr = "aleksei.trankov.newtheunarchiver.unix-ar-archive"
         static let msi = "aleksei.trankov.newtheunarchiver.msi-installer"
         static let brotli = "aleksei.trankov.newtheunarchiver.brotli-archive"
@@ -86,15 +99,15 @@ enum SupportedFormats {
         Format(utiIdentifier: "public.lz4-archive", extensions: ["lz4", "tar.lz4"]),
         Format(utiIdentifier: "com.winzip.zipx-archive", extensions: ["zipx"]),
         Format(utiIdentifier: "com.microsoft.cab", extensions: ["cab"]),
-        Format(utiIdentifier: "org.debian.deb-archive", extensions: ["deb", "udeb"]),
-        Format(utiIdentifier: "com.redhat.rpm-archive", extensions: ["rpm"]),
+        Format(utiIdentifier: ImportedUTI.deb, extensions: ["deb", "udeb"]),
+        Format(utiIdentifier: ImportedUTI.rpm, extensions: ["rpm"]),
         Format(utiIdentifier: "public.cpio-archive", extensions: ["cpio"]),
         Format(utiIdentifier: "com.apple.xar-archive", extensions: ["xar"]),
         Format(utiIdentifier: "com.apple.installer-package-archive", extensions: ["pkg"]),
         Format(utiIdentifier: ImportedUTI.unixAr, extensions: ["ar"]),
         Format(utiIdentifier: ImportedUTI.msi, extensions: ["msi"]),
         Format(utiIdentifier: "public.iso-image", extensions: ["iso"]),
-        Format(utiIdentifier: "org.archive.warc-archive", extensions: ["warc"]),
+        Format(utiIdentifier: ImportedUTI.warc, extensions: ["warc"]),
         Format(utiIdentifier: "com.microsoft.windows-executable", extensions: ["exe"]),
 
         // Standalone compressors.
@@ -143,6 +156,17 @@ enum SupportedFormats {
         Format(utiIdentifier: "org.oasis-open.opendocument.spreadsheet", extensions: ["ods"], rank: .alternate),
         Format(utiIdentifier: "org.oasis-open.opendocument.presentation", extensions: ["odp"], rank: .alternate),
     ]
+
+    /// Every UTI the app declares itself — must match
+    /// `UTImportedTypeDeclarations` in `Info.plist` exactly. A type missing
+    /// from here resolves only by luck (another app declaring it, or a stale
+    /// Launch Services record) and silently stops working on a clean Mac.
+    static let appDeclaredUTIs: Set<String> = Set(
+        formats.map(\.utiIdentifier).filter {
+            $0.hasPrefix("aleksei.trankov.newtheunarchiver.")
+                || $0 == ImportedUTI.deb || $0 == ImportedUTI.rpm || $0 == ImportedUTI.warc
+        }
+    )
 
     /// Flat list of trailing extensions for `Info.plist` sync. Materialized
     /// once at startup — `formats` itself is static-let.

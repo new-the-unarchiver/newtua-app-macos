@@ -698,6 +698,43 @@
 				<string>public.archive</string>
 			</array>
 			<key>UTTypeDescription</key>
+			<string>Debian package</string>
+			<key>UTTypeIdentifier</key>
+			<string>org.debian.deb-archive</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>deb</string>
+					<string>udeb</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>RPM package</string>
+			<key>UTTypeIdentifier</key>
+			<string>com.redhat.rpm-archive</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>rpm</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeDescription</key>
 			<string>Unix ar archive</string>
 			<key>UTTypeIdentifier</key>
 			<string>aleksei.trankov.newtheunarchiver.unix-ar-archive</string>
@@ -724,6 +761,24 @@
 				<key>public.filename-extension</key>
 				<array>
 					<string>msi</string>
+				</array>
+			</dict>
+		</dict>
+		<dict>
+			<key>UTTypeConformsTo</key>
+			<array>
+				<string>public.data</string>
+				<string>public.archive</string>
+			</array>
+			<key>UTTypeDescription</key>
+			<string>WARC archive</string>
+			<key>UTTypeIdentifier</key>
+			<string>org.archive.warc-archive</string>
+			<key>UTTypeTagSpecification</key>
+			<dict>
+				<key>public.filename-extension</key>
+				<array>
+					<string>warc</string>
 				</array>
 			</dict>
 		</dict>

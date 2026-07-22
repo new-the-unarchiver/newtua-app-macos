@@ -63,16 +63,20 @@ struct FormatRegistrySyncTests {
             extensionsByUTI[uti] = exts
         }
 
-        // Anything in our own reverse-DNS namespace must be declared, because
-        // macOS has no built-in type for it.
-        let ourNamespace = "aleksei.trankov.newtheunarchiver."
+        // Every type macOS does not ship must be declared by us, with exactly
+        // the extensions the registry lists.
         for format in SupportedFormats.formats
-        where format.utiIdentifier.hasPrefix(ourNamespace) {
+        where SupportedFormats.appDeclaredUTIs.contains(format.utiIdentifier) {
             let declared = extensionsByUTI[format.utiIdentifier]
             #expect(declared != nil, "\(format.utiIdentifier) is missing from UTImportedTypeDeclarations")
             #expect(declared == format.extensions,
                     "\(format.utiIdentifier): plist lists \(declared ?? []), registry lists \(format.extensions)")
         }
+
+        // And nothing extra: a declaration with no registry entry is dead
+        // weight that still competes for the extension in Finder.
+        #expect(Set(extensionsByUTI.keys) == SupportedFormats.appDeclaredUTIs,
+                "drift: \(Set(extensionsByUTI.keys).symmetricDifference(SupportedFormats.appDeclaredUTIs))")
     }
 
     @Test("Quick Look advertises exactly the registry's types")
