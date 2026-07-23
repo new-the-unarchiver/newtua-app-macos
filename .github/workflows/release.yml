@@ -55,6 +55,17 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "Building version $VERSION"
 
+          # The tag decides what ships, so a stale MARKETING_VERSION cannot
+          # break the release — but it does mean local builds carry a
+          # different number than the published one. Say so rather than let
+          # it drift quietly.
+          IN_PROJECT=$(grep -m1 -oE 'MARKETING_VERSION = [^;]+' \
+            NewTheUnarchiver/NewTheUnarchiver.xcodeproj/project.pbxproj \
+            | sed 's/MARKETING_VERSION = //')
+          if [ "$IN_PROJECT" != "$VERSION" ]; then
+            echo "::warning::project.pbxproj says MARKETING_VERSION=$IN_PROJECT but this release is $VERSION — local builds will be numbered differently"
+          fi
+
       # 26.5 is the runner default today; select it explicitly when present so
       # a future default bump cannot silently change the toolchain, but do not
       # hard-fail if the path differs — any SDK >= 26.5 builds this app.
